@@ -171,13 +171,42 @@ echo         Migration done.
 
 echo         Database setup complete  OK
 
-:: ─── Step 7: Seed Admin ──────────────────────────────────────────
+:: ─── Step 7: Seed Data ─────────────────────────────────────────────
 echo.
-echo  [7/7] Seeding admin account...
+echo  [7/7] Seeding initial data...
+
+echo         Seeding admin account...
 call npx ts-node --project tsconfig.json database/seed-admin.ts
 if %errorlevel% neq 0 (
-    echo  [WARNING] Seed returned errors — admin may already exist, which is fine.
+    echo  [WARNING] Admin seed returned errors — admin may already exist, which is fine.
 )
+
+echo         Seeding departments, courses, subjects...
+call npx ts-node --project tsconfig.json database/seed-data.ts
+if %errorlevel% neq 0 (
+    echo  [WARNING] Data seed returned errors — data may already exist.
+)
+
+echo         Seeding faculty accounts...
+call npx ts-node --project tsconfig.json database/seed-faculty.ts
+if %errorlevel% neq 0 (
+    echo  [WARNING] Faculty seed returned errors — faculty may already exist.
+)
+
+echo         Seeding student accounts...
+call npx ts-node --project tsconfig.json database/seed-students.ts
+if %errorlevel% neq 0 (
+    echo  [WARNING] Student seed returned errors — students may already exist.
+)
+
+echo         Seeding enrollments...
+call npx ts-node --project tsconfig.json database/seed-enrollments.ts
+if %errorlevel% neq 0 (
+    echo  [WARNING] Enrollment seed returned errors — enrollments may already exist.
+)
+
+echo.
+echo         All seeders complete  OK
 echo.
 
 :: ─── Done ────────────────────────────────────────────────────────
@@ -185,9 +214,10 @@ echo  ╔═══════════════════════�
 echo  ║           Setup Complete!                ║
 echo  ╚══════════════════════════════════════════╝
 echo.
-echo   Admin credentials:
-echo     Email    : admin@acadtrack.edu
-echo     Password : Admin@2026
+echo   Test credentials:
+echo     Admin   : admin@acadtrack.edu / Admin@2026
+echo     Faculty : faculty01@acadtrack.edu / Faculty2026
+echo     Student : 2026-0001@acadtrack.edu / Student2026
 echo.
 echo   App URL: %APP_URL%
 echo.
