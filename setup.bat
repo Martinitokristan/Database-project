@@ -142,13 +142,27 @@ echo  [6/7] Setting up MySQL database...
 set MYSQL_ARGS=-h%DB_HOST% -P%DB_PORT% -u%DB_USER%
 if not "%DB_PASS%"=="" set MYSQL_ARGS=%MYSQL_ARGS% -p%DB_PASS%
 
-:: Create the database if it doesn't exist
-echo         Creating database '%DB_NAME%' if needed...
-"%MYSQL_EXE%" %MYSQL_ARGS% -e "CREATE DATABASE IF NOT EXISTS \`%DB_NAME%\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>&1
+:: Test MySQL connection first
+echo         Testing MySQL connection...
+"%MYSQL_EXE%" %MYSQL_ARGS% -e "SELECT 1;" >nul 2>&1
 if %errorlevel% neq 0 (
     echo.
-    echo  [ERROR] Could not connect to MySQL or create database.
-    echo  Make sure XAMPP MySQL is running and credentials are correct.
+    echo  [ERROR] Cannot connect to MySQL.
+    echo  Please ensure:
+    echo   1. XAMPP MySQL is running
+    echo   2. Host/port/user/password are correct
+    echo   3. No firewall blocking port %DB_PORT%
+    pause & exit /b 1
+)
+echo         MySQL connection OK.
+
+:: Create the database if it doesn't exist
+echo         Creating database '%DB_NAME%' if needed...
+"%MYSQL_EXE%" %MYSQL_ARGS% -e "CREATE DATABASE IF NOT EXISTS %DB_NAME% CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>&1
+if %errorlevel% neq 0 (
+    echo.
+    echo  [ERROR] Failed to create database.
+    echo  Check permissions and try again.
     pause & exit /b 1
 )
 echo         Database ready.
