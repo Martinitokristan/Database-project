@@ -1,0 +1,82 @@
+import { NextRequest } from 'next/server';
+import { query } from '@/lib/db';
+import { requireRole, apiHandler, json, getTokenPayload } from '@/lib/middleware';
+import { z } from 'zod';
+
+const UpdateSectionSchema = z.object({
+  subject_id:    z.number().int().positive().optional(),
+  instructor_id: z.string().optional(),
+  semester_id:   z.number().int().positive().optional(),
+  section_name:  z.string().min(1).max(100).optional(),
+  capacity:      z.number().int().min(1).optional(),
+});
+
+export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
+  const payload = getTokenPayload(req);
+  if (!payload) throw { status: 401, message: 'Unauthenticated.' };
+  const role = payload.role_name.toLowerCase();
+  if (!['admin', 'faculty'].includes(role)) throw { status: 403, message: 'Access denied.' };
+
+  const { id } = await ctx.params;
+
+  const sections = await query<any[]>(
+    `SELECT sec.*,
+            sub.code AS subject_code, sub.title AS subject_title, sub.credit_units,
+            p.first_name AS instructor_first, p.last_name AS instructor_last,
+            sem.school_year, sem.term, sem.status AS semester_status,
+            COUNT(e.enrollment_id) AS enrolled_count
+     FROM sections sec
+     JOIN subjects sub ON sec.subject_id = sub.subject_id
+     JOIN users u ON sec.instructor_id = u.user_id
+     LEFT JOIN profiles p ON p.user_id = u.user_id
+     JOIN semesters sem ON sec.semester_id = sem.semester_id
+     LEFT JOIN enrollments e ON e.section_id = sec.section_id AND e.status = 'Enrolled'
+     WHERE sec.section_id = ?
+     GROUP BY sec.section_id`,
+    [id]
+  );
+
+  if (sections.length === 0) return json({ success: false, message: 'Section not found.' }, 404);
+
+  if (role === 'faculty' && sections[0].instructor_id !== payload.user_id) {
+    throw { status: 403, message: 'Access denied.' };
+  }
+
+  return json({ success: true, data: sections[0] });
+});
+
+export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
+  requireRole(req, ['admin']);
+  const { id } = await ctx.params;
+  const body   = await req.json();
+  const parsed = UpdateSectionSchema.safeParse(body);
+  if (!parsed.success) {
+    return json({ success: false, message: 'Validation failed.', data: parsed.error.flatten() }, 422);
+  }
+
+  const existing = await query<any[]>('SELECT section_id FROM sections WHERE section_id = ?', [id]);
+  if (existing.length === 0) return json({ success: false, message: 'Section not found.' }, 404);
+
+  const fields = parsed.data;
+  const setClauses = Object.keys(fields).map(k => `${k} = ?`).join(', ');
+  const values     = Object.values(fields);
+  if (!setClauses) return json({ success: false, message: 'No fields to update.' }, 422);
+
+  await query(`UPDATE sections SET ${setClauses} WHERE section_id = ?`, [...values, id]);
+  return json({ success: true, message: 'Section updated.' });
+});
+
+export const DELETE = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
+  requireRole(req, ['admin']);
+  const { id } = await ctx.params;
+
+  const existing = await query<any[]>('SELECT section_id FROM sections WHERE section_id = ?', [id]);
+  if (existing.length === 0) return json({ success: false, message: 'Section not found.' }, 404);
+
+  const inUse = await query<any[]>('SELECT enrollment_id FROM enrollments WHERE section_id = ? LIMIT 1', [id]);
+  if (inUse.length > 0) return json({ success: false, message: 'Cannot delete: section has enrollments.' }, 409);
+
+  await query('DELETE FROM schedules WHERE section_id = ?', [id]);
+  await query('DELETE FROM sections WHERE section_id = ?', [id]);
+  return json({ success: true, message: 'Section deleted.' });
+});
