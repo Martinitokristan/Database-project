@@ -181,6 +181,13 @@ echo         Running migrate-semester-v2.sql...
 if %errorlevel% neq 0 (
     echo  [WARNING] Migration returned errors ^(may be safe if already applied^).
 )
+
+:: Run assessment migration
+echo         Running migrate-assessments-v1.sql...
+"%MYSQL_EXE%" %MYSQL_ARGS% %DB_NAME% < database\migrate-assessments-v1.sql 2>&1
+if %errorlevel% neq 0 (
+    echo  [WARNING] Assessment migration returned errors ^(may be safe if already applied^).
+)
 echo         Migration done.
 
 echo         Database setup complete  OK

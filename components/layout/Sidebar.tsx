@@ -13,7 +13,7 @@ import {
   LayoutDashboard, Users, GraduationCap, Building2, BookOpen,
   BookMarked, Layers, ClipboardList, Star, Megaphone,
   Home, Calendar, LogOut, ChevronDown, ChevronRight, LucideIcon,
-  CalendarRange, UserCircle,
+  CalendarRange, UserCircle, ClipboardCheck,
 } from 'lucide-react';
 
 interface NavItem {
@@ -73,6 +73,7 @@ const facultyGroups: NavGroup[] = [
     items: [
       { label: 'Home',          href: '/home',          icon: Home },
       { label: 'Sections',      href: '/sections',      icon: Layers },
+      { label: 'Assessments',   href: '/assessments',   icon: ClipboardCheck },
       { label: 'Semesters',     href: '/semesters',     icon: CalendarRange },
       { label: 'Announcements', href: '/announcements', icon: Megaphone },
     ],
@@ -90,6 +91,7 @@ const studentGroups: NavGroup[] = [
     items: [
       { label: 'Home',          href: '/home',          icon: Home },
       { label: 'Schedule',      href: '/schedule',      icon: Calendar },
+      { label: 'Assessments',   href: '/assessments',   icon: ClipboardCheck },
       { label: 'Semesters',     href: '/semesters',     icon: CalendarRange },
       { label: 'Grades',        href: '/grades',        icon: Star },
       { label: 'Announcements', href: '/announcements', icon: Megaphone },

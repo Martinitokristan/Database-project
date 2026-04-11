@@ -1,0 +1,37 @@
+type,question,points,col4,col5,col6,col7,col8
+MultipleChoice,What is the capital of France?,1,Paris,London,Berlin,Madrid,2
+MultipleChoice,Which planet is known as the Red Planet?,1,Mars,Venus,Jupiter,Saturn,1
+MultipleChoice,Who painted the Mona Lisa?,1,Leonardo da Vinci,Pablo Picasso,Vincent van Gogh,Michelangelo,1
+MultipleChoice,What is the largest ocean on Earth?,1,Pacific Ocean,Atlantic Ocean,Indian Ocean,Arctic Ocean,1
+MultipleChoice,In which year did World War II end?,1,1945,1939,1950,1965,1
+MultipleChoice,What is the chemical symbol for gold?,1,Au,Ag,Fe,Cu,1
+MultipleChoice,Which programming language is known as the "language of the web"?,1,JavaScript,Python,Java,C++,1
+MultipleChoice,What is the smallest prime number?,1,2,3,5,7,1
+MultipleChoice,Who wrote "Romeo and Juliet"?,1,William Shakespeare,Charles Dickens,Jane Austen,Mark Twain,1
+MultipleChoice,What is the speed of light in vacuum?,1,299,792,458 m/s,150,000,000 m/s,500,000,000 m/s,1,000,000,000 m/s,1
+MultipleChoice,Which element has the atomic number 1?,1,Hydrogen,Helium,Oxygen,Carbon,1
+MultipleChoice,What is the largest mammal in the world?,1,Blue Whale,African Elephant,Giraffe,Polar Bear,1
+MultipleChoice,In which country did the Olympics originate?,1,Greece,Rome,Egypt,China,1
+MultipleChoice,What is the square root of 144?,1,12,10,14,16,1
+MultipleChoice,Who developed the theory of relativity?,1,Albert Einstein,Isaac Newton,Stephen Hawking,Nikola Tesla,1
+MultipleChoice,What is the main function of the heart?,1,Pump blood,Filter air,Digest food,Produce hormones,1
+MultipleChoice,Which continent is the Sahara Desert located in?,1,Africa,Asia,Australia,South America,1
+MultipleChoice,What is the boiling point of water at sea level?,1,100°C,0°C,50°C,200°C,1
+MultipleChoice,Who invented the telephone?,1,Alexander Graham Bell,Thomas Edison,Benjamin Franklin,Guglielmo Marconi,1
+MultipleChoice,What is the largest planet in our solar system?,1,Jupiter,Saturn,Uranus,Neptune,1
+MultipleChoice,Which vitamin is produced when skin is exposed to sunlight?,1,Vitamin D,Vitamin A,Vitamin C,Vitamin B12,1
+MultipleChoice,What is the currency of Japan?,1,Yen,Dollar,Euro,Pound,1
+MultipleChoice,Who was the first person to walk on the moon?,1,Neil Armstrong,Buzz Aldrin,Yuri Gagarin,John Glenn,1
+MultipleChoice,What is the hardest natural substance on Earth?,1,Diamond,Gold,Iron,Silver,1
+MultipleChoice,Which gas makes up most of Earth's atmosphere?,1,Nitrogen,Oxygen,Carbon Dioxide,Hydrogen,1
+MultipleChoice,What is the largest bone in the human body?,1,Femur,Humerus,Skull,Ribs,1
+MultipleChoice,Who wrote "To Kill a Mockingbird"?,1,Harper Lee,J.D. Salinger,F. Scott Fitzgerald,Ernest Hemingway,1
+MultipleChoice,What is the capital of Australia?,1,Canberra,Sydney,Melbourne,Brisbane,1
+MultipleChoice,Which instrument measures temperature?,1,Thermometer,Barometer,Hygrometer,Anemometer,1
+MultipleChoice,What is the chemical formula for water?,1,H2O,CO2,O2,N2,1
+MultipleChoice,Who painted "The Starry Night"?,1,Vincent van Gogh,Pablo Picasso,Claude Monet,Salvador Dalí,1
+Matching,Match the country to its capital,1,France,Paris,Japan,Tokyo,Brazil,Brasilia,Canada,Ottawa,Egypt,Cairo,Australia,Canberra,India,New Delhi,Germany,Berlin,Mexico,Mexico City,Russia,Moscow,Italy,Rome
+Matching,Match the element to its symbol,1,Oxygen,O2,Carbon,C,Hydrogen,H,Nitrogen,N,Gold,Au,Silver,Ag,Iron,Fe,Copper,Cu,Helium,He,Calcium,Ca,Sodium,Na,Chlorine,Cl,Potassium,K
+Matching,Match the scientist to their discovery,1,Isaac Newton,Gravity,Albert Einstein,Relativity,Marie Curie,Radioactivity,Charles Darwin,Evolution,Louis Pasteur,Germ Theory,Galileo Galilei,Telescope,Nikola Tesla,AC Electricity,Alexander Fleming,Penicillin,Dmitri Mendeleev,Periodic Table,James Watson,DNA Structure,Thomas Edison,Light Bulb
+Matching,Match the literary work to its author,1,1984,George Orwell,Pride and Prejudice,Jane Austen,The Great Gatsby,F. Scott Fitzgerald,To Kill a Mockingbird,Harper Lee,The Catcher in the Rye,J.D. Salinger,Brave New World,Aldous Huxley,Animal Farm,George Orwell,Lord of the Flies,William Golding,The Hobbit,J.R.R. Tolkien,Harry Potter,J.K. Rowling,Fahrenheit 451,Ray Bradbury
+Matching,Match the mathematical term to its definition,1,Addition,Combining numbers,Subtraction,Taking away numbers,Multiplication,Repeated addition,Division,Splitting into equal parts,Algebra,Using letters for numbers,Geometry,Study of shapes,Calculus,Study of change,Statistics,Study of data,Probability,Likelihood of events,Fractions,Parts of a whole

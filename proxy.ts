@@ -48,6 +48,12 @@ export function proxy(req: NextRequest) {
       if (isStudentOnly && role !== 'student') {
         return NextResponse.redirect(new URL('/login', req.url));
       }
+
+      const assessmentTakePaths = [/^\/assessments\/\d+\/take(\/.*)?$/];
+      const isTakePage = assessmentTakePaths.some(r => r.test(path));
+      if (isTakePage && role !== 'student') {
+        return NextResponse.redirect(new URL(`/assessments/${path.split('/')[2]}`, req.url));
+      }
     }
   }
 

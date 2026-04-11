@@ -130,6 +130,93 @@ export interface Announcement {
   sender?:         User;
 }
 
+export interface Assessment {
+  assessment_id:      number;
+  title:              string;
+  description?:       string;
+  assessment_type:    'Quiz' | 'Exam';
+  section_id:         number;
+  created_by:         string;
+  timer_minutes?:     number | null;
+  per_question_timer?:number | null;
+  shuffle_questions:  boolean;
+  shuffle_choices:    boolean;
+  allow_retakes:      boolean;
+  max_attempts:       number;
+  assessment_password?:string | null;
+  open_at?:           string | null;
+  close_at?:          string | null;
+  is_open:            boolean;
+  show_results:       boolean;
+  status:             'Draft' | 'Published' | 'Closed';
+  created_at:         string;
+  section?:           Section;
+  question_count?:    number;
+}
+
+export interface AssessmentQuestion {
+  question_id:    number;
+  assessment_id:  number;
+  question_text:  string;
+  question_type:  'Identification' | 'MultipleChoice' | 'Matching';
+  points:         number;
+  position:       number;
+  case_sensitive: boolean;
+  options?:       AssessmentOption[];
+  answers?:       AssessmentAnswer[];
+}
+
+export interface AssessmentOption {
+  option_id:   number;
+  question_id: number;
+  option_text: string;
+  is_correct:  boolean;
+  match_text?: string | null;
+  position:    number;
+}
+
+export interface AssessmentAnswer {
+  answer_id:   number;
+  question_id: number;
+  answer_text: string;
+}
+
+export interface AssessmentAccess {
+  access_id?:    number;
+  assessment_id: number;
+  user_id:       string;
+  is_enabled:    boolean;
+  first_name?:   string;
+  last_name?:    string;
+  email?:        string;
+}
+
+export interface AssessmentAttempt {
+  attempt_id:    number;
+  assessment_id: number;
+  user_id:       string;
+  attempt_no:    number;
+  started_at:    string;
+  submitted_at?: string | null;
+  time_spent?:   number | null;
+  score?:        number | null;
+  max_score?:    number | null;
+  status:        'InProgress' | 'Submitted' | 'Graded';
+  shuffle_seed?: string | null;
+}
+
+export interface AssessmentResponse {
+  response_id:         number;
+  attempt_id:          number;
+  question_id:         number;
+  response_text?:      string | null;
+  selected_option_id?: number | null;
+  match_json?:         string | null;
+  is_correct?:         boolean | null;
+  points_earned?:      number | null;
+  manually_overridden: boolean;
+}
+
 export interface AuthState {
   user:       User | null;
   role:       'admin' | 'faculty' | 'student' | null;
