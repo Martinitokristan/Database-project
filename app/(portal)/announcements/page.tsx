@@ -128,7 +128,7 @@ function AdminAnnouncements() {
         </div>
       )}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent aria-describedby={undefined} className="max-w-lg">
           <DialogHeader><DialogTitle>Post Announcement</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1.5"><Label>Title</Label><Input {...register('title')} /></div>
@@ -201,7 +201,7 @@ function FacultyAnnouncements() {
         <div className="space-y-3">{announcements.map(a => <AnnouncementCard key={a.announcement_id} a={a} />)}</div>
       )}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader><DialogTitle>Post to Section</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1.5"><Label>Section</Label>

@@ -7,7 +7,7 @@ export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   const payload = requireRole(req, ['Faculty', 'Admin']);
 
   const [aRows] = await pool.execute(
-    'SELECT created_by, section_id FROM assessments WHERE assessment_id = ?', [id]
+    'SELECT a.created_by, so.section_id FROM assessments a JOIN subject_offerings so ON a.offering_id = so.offering_id WHERE a.assessment_id = ?', [id]
   ) as any;
   if (!aRows.length) throw { status: 404, message: 'Assessment not found.' };
   if (payload.role_name === 'Faculty' && aRows[0].created_by !== payload.user_id) {
@@ -44,7 +44,7 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   const payload = requireRole(req, ['Faculty', 'Admin']);
 
   const [aRows] = await pool.execute(
-    'SELECT created_by, section_id FROM assessments WHERE assessment_id = ?', [id]
+    'SELECT a.created_by, so.section_id FROM assessments a JOIN subject_offerings so ON a.offering_id = so.offering_id WHERE a.assessment_id = ?', [id]
   ) as any;
   if (!aRows.length) throw { status: 404, message: 'Assessment not found.' };
   if (payload.role_name === 'Faculty' && aRows[0].created_by !== payload.user_id) {

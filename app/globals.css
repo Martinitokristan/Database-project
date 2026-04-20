@@ -49,6 +49,11 @@
   --color-brand-warning: #D97706;
   --color-brand-danger: #DC2626;
   --color-brand-info: #0EA5E9;
+
+  /* Glassmorphism & Effects */
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-blur: 12px;
 }
 
 :root {
@@ -120,4 +125,123 @@
   html {
     @apply font-sans;
   }
+}
+
+/* ── Landscape Modals ── */
+.modal-landscape {
+  display: flex !important;
+  flex-direction: row !important;
+  min-width: 780px !important;
+  max-width: 900px !important;
+  min-height: 480px !important;
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+.modal-left-panel {
+  width: 30% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 2rem !important;
+  gap: 1rem !important;
+  color: white !important;
+}
+
+.modal-right-panel {
+  width: 70% !important;
+  background: var(--background) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 2rem !important;
+  overflow-y: auto !important;
+}
+
+.modal-info-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 1.5rem 2rem !important;
+  margin-bottom: 2rem !important;
+}
+
+.modal-actions {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 0.75rem !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  padding-top: 1.5rem !important;
+  border-top: 1px solid var(--border) !important;
+  margin-top: auto !important;
+}
+
+/* ── Attendance Grid ── */
+.attendance-grid {
+  display: grid;
+  grid-template-columns: 240px repeat(31, 40px);
+  overflow-x: auto;
+}
+
+.attendance-cell {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  font-size: 1.1rem;
+  transition: background 0.1s ease;
+}
+
+.attendance-cell:hover {
+  background: var(--muted);
+}
+
+.attendance-cell.present { color: #22C55E; }
+.attendance-cell.absent { color: #EF4444; }
+.attendance-cell.late { color: #F59E0B; }
+.attendance-cell.none { color: var(--muted-foreground); }
+/* -- Premium UI Utilities -- */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.dark .glass-panel {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glow-primary {
+  box-shadow: 0 0 15px -3px rgba(37, 99, 235, 0.2);
+}
+
+.animate-in-fade {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.nav-active-glow {
+  position: relative;
+}
+
+.nav-active-glow::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 15%;
+  height: 70%;
+  width: 4px;
+  background: var(--primary);
+  border-radius: 0 4px 4px 0;
+  box-shadow: 2px 0 8px var(--primary);
 }

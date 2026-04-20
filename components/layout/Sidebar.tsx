@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { ThemeToggle } from '@/components/shared/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { authService } from '@/services/authService';
@@ -13,18 +12,18 @@ import {
   LayoutDashboard, Users, GraduationCap, Building2, BookOpen,
   BookMarked, Layers, ClipboardList, Star, Megaphone,
   Home, Calendar, LogOut, ChevronDown, ChevronRight, LucideIcon,
-  CalendarRange, UserCircle, ClipboardCheck,
+  CalendarRange, UserCircle, ClipboardCheck, CalendarCheck,
 } from 'lucide-react';
 
 interface NavItem {
   label: string;
-  href:  string;
-  icon:  LucideIcon;
+  href: string;
+  icon: LucideIcon;
 }
 
 interface NavGroup {
-  label:    string;
-  items:    NavItem[];
+  label: string;
+  items: NavItem[];
   collapsible?: boolean;
 }
 
@@ -37,24 +36,21 @@ const adminGroups: NavGroup[] = [
     label: 'People', collapsible: true,
     items: [
       { label: 'Students', href: '/students', icon: Users },
-      { label: 'Faculty',  href: '/faculty',  icon: GraduationCap },
+      { label: 'Faculty', href: '/faculty', icon: GraduationCap },
     ],
   },
   {
     label: 'Academic', collapsible: true,
     items: [
-      { label: 'Departments', href: '/departments', icon: Building2 },
-      { label: 'Courses',     href: '/courses',     icon: BookOpen },
-      { label: 'Subjects',    href: '/subjects',    icon: BookMarked },
-      { label: 'Semesters',   href: '/semesters',   icon: CalendarRange },
+      { label: 'Programs & Degrees', href: '/academic', icon: GraduationCap },
+      { label: 'Terms & Sections', href: '/semesters', icon: CalendarRange },
     ],
   },
   {
     label: 'Operations', collapsible: true,
     items: [
-      { label: 'Sections',      href: '/sections',      icon: Layers },
-      { label: 'Enrollments',   href: '/enrollments',   icon: ClipboardList },
-      { label: 'Grades',        href: '/grades',        icon: Star },
+      { label: 'Admissions & Enrollment', href: '/enrollments', icon: ClipboardList },
+      { label: 'Grades', href: '/grades', icon: Star },
       { label: 'Announcements', href: '/announcements', icon: Megaphone },
     ],
   },
@@ -71,10 +67,11 @@ const facultyGroups: NavGroup[] = [
   {
     label: '', collapsible: false,
     items: [
-      { label: 'Home',          href: '/home',          icon: Home },
-      { label: 'Sections',      href: '/sections',      icon: Layers },
-      { label: 'Assessments',   href: '/assessments',   icon: ClipboardCheck },
-      { label: 'Semesters',     href: '/semesters',     icon: CalendarRange },
+      { label: 'Home', href: '/home', icon: Home },
+      { label: 'Sections', href: '/sections', icon: Layers },
+      { label: 'Assessments', href: '/assessments', icon: ClipboardCheck },
+      { label: 'Attendance', href: '/attendance', icon: CalendarCheck },
+      { label: 'Semesters', href: '/semesters', icon: CalendarRange },
       { label: 'Announcements', href: '/announcements', icon: Megaphone },
     ],
   },
@@ -89,11 +86,11 @@ const studentGroups: NavGroup[] = [
   {
     label: '', collapsible: false,
     items: [
-      { label: 'Home',          href: '/home',          icon: Home },
-      { label: 'Schedule',      href: '/schedule',      icon: Calendar },
-      { label: 'Assessments',   href: '/assessments',   icon: ClipboardCheck },
-      { label: 'Semesters',     href: '/semesters',     icon: CalendarRange },
-      { label: 'Grades',        href: '/grades',        icon: Star },
+      { label: 'Home', href: '/home', icon: Home },
+      { label: 'Schedule', href: '/schedule', icon: Calendar },
+      { label: 'Assessments', href: '/assessments', icon: ClipboardCheck },
+      { label: 'Semesters', href: '/semesters', icon: CalendarRange },
+      { label: 'Grades', href: '/grades', icon: Star },
       { label: 'Announcements', href: '/announcements', icon: Megaphone },
     ],
   },
@@ -128,10 +125,10 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
 
 export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
-  const router   = useRouter();
+  const router = useRouter();
   const { user } = useAuth();
 
-  const groups     = role === 'admin' ? adminGroups : role === 'faculty' ? facultyGroups : studentGroups;
+  const groups = role === 'admin' ? adminGroups : role === 'faculty' ? facultyGroups : studentGroups;
   const standalone = role === 'admin' ? adminStandalone : [];
 
   /* default: all groups open */
@@ -203,14 +200,13 @@ export function Sidebar({ role }: SidebarProps) {
 
       {/* Footer */}
       <div className="border-t border-sidebar-border px-3 py-3 space-y-2">
-        <div className="flex items-center justify-between px-3 py-1">
-          <div className="text-xs text-sidebar-foreground/60">
-            <p className="font-medium text-sidebar-foreground truncate max-w-[130px]">
+        <div className="flex items-center px-3 py-1 text-xs text-sidebar-foreground/60">
+          <div>
+            <p className="font-medium text-sidebar-foreground truncate max-w-[180px]">
               {user?.first_name} {user?.last_name}
             </p>
             <p className="capitalize">{role}</p>
           </div>
-          <ThemeToggle />
         </div>
         <Button
           variant="ghost"

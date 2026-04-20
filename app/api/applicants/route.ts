@@ -3,17 +3,32 @@ import { transaction, query } from '@/lib/db';
 import { requireRole, apiHandler, json } from '@/lib/middleware';
 import { z } from 'zod';
 
+const AddressSchema = z.object({
+  province:        z.string().min(1),
+  city:            z.string().min(1),
+  postalCode:      z.string().min(1),
+  streetBarangay:  z.string().min(1),
+});
+
+const OptionalAddressSchema = z.object({
+  province:        z.string().optional().default(''),
+  city:            z.string().optional().default(''),
+  postalCode:      z.string().optional().default(''),
+  streetBarangay:  z.string().optional().default(''),
+}).optional().nullable();
+
 const CreateApplicantSchema = z.object({
-  email:       z.string().email(),
-  course_id:   z.number().int().positive(),
-  first_name:  z.string().min(1).max(100),
-  middle_name: z.string().max(100).optional().nullable(),
-  last_name:   z.string().min(1).max(100),
-  suffix:      z.string().max(20).optional().nullable(),
-  address:     z.string().min(1),
-  phone:       z.string().min(1).max(20),
-  gender:      z.enum(['Male', 'Female', 'Other']),
-  date_of_birth: z.string().min(1),
+  email:           z.string().email(),
+  course_id:       z.number().int().positive(),
+  first_name:      z.string().min(1).max(100),
+  middle_name:     z.string().max(100).optional().nullable(),
+  last_name:       z.string().min(1).max(100),
+  suffix:          z.string().max(20).optional().nullable(),
+  current_address: AddressSchema,
+  home_address:    OptionalAddressSchema,
+  phone:           z.string().min(1).max(11),
+  gender:          z.enum(['Male', 'Female', 'Other']),
+  date_of_birth:   z.string().min(1),
 });
 
 export const POST = apiHandler(async (req: NextRequest) => {
@@ -23,9 +38,15 @@ export const POST = apiHandler(async (req: NextRequest) => {
     return json({ success: false, message: 'Validation failed.', data: parsed.error.flatten() }, 422);
   }
 
-  const { email, course_id, first_name, middle_name, last_name, suffix, address, phone, gender, date_of_birth } = parsed.data;
+  const {
+    email, course_id, first_name, middle_name, last_name, suffix,
+    current_address, home_address, phone, gender, date_of_birth,
+  } = parsed.data;
 
-  const existing = await query<any[]>('SELECT applicant_id FROM applicants WHERE email = ?', [email]);
+  // Build a combined address JSON string for storage
+  const addressJson = JSON.stringify({ current: current_address, home: home_address ?? null });
+
+  const existing = await query<any[]>('SELECT profile_id FROM profiles WHERE personal_email = ?', [email]);
   if (existing.length > 0) {
     return json({ success: false, message: 'An application with this email already exists.' }, 409);
   }
@@ -35,24 +56,16 @@ export const POST = apiHandler(async (req: NextRequest) => {
     return json({ success: false, message: 'An account with this email already exists.' }, 409);
   }
 
-  const applicantId = await transaction(async (conn) => {
-    const today = new Date().toISOString().slice(0, 10);
-    const [result] = await conn.execute(
-      'INSERT INTO applicants (email, course_id, status, applied_at) VALUES (?, ?, "Pending", ?)',
-      [email, course_id, today]
-    ) as any;
-    const newApplicantId = result.insertId;
+  const today = new Date().toISOString().slice(0, 10);
+  const [result] = await query(
+    `INSERT INTO profiles (user_id, first_name, middle_name, last_name, suffix, address, phone, gender, date_of_birth, year_level, academic_status, personal_email, course_id, applicant_status, applied_at)
+     VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, '1st Year', 'Good Standing', ?, ?, 'Pending', ?)`,
+    [first_name, middle_name ?? null, last_name, suffix ?? null, addressJson, phone, gender, date_of_birth, email, course_id, today]
+  ) as any;
 
-    await conn.execute(
-      `INSERT INTO profiles (applicant_id, first_name, middle_name, last_name, suffix, address, phone, gender, date_of_birth)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [newApplicantId, first_name, middle_name ?? null, last_name, suffix ?? null, address, phone, gender, date_of_birth]
-    );
+  const newProfileId = result.insertId;
 
-    return newApplicantId;
-  });
-
-  return json({ success: true, data: { applicant_id: applicantId }, message: 'Application submitted successfully.' }, 201);
+  return json({ success: true, data: { applicant_id: newProfileId }, message: 'Application submitted successfully.' }, 201);
 });
 
 export const GET = apiHandler(async (req: NextRequest) => {
@@ -64,29 +77,36 @@ export const GET = apiHandler(async (req: NextRequest) => {
   const limit  = parseInt(searchParams.get('limit') || '20');
   const offset = (page - 1) * limit;
 
-  let whereClauses = [];
+  let whereClauses: string[] = ['p.applicant_status IS NOT NULL'];
   let params: any[] = [];
 
   if (status) {
-    whereClauses.push('a.status = ?');
+    whereClauses.push('p.applicant_status = ?');
     params.push(status);
   }
 
-  const where = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+  const where = `WHERE ${whereClauses.join(' AND ')}`;
 
   const applicants = await query<any[]>(
-    `SELECT a.*, c.course_name, p.first_name, p.last_name, p.middle_name, p.gender, p.phone
-     FROM applicants a
-     LEFT JOIN courses c ON a.course_id = c.course_id
-     LEFT JOIN profiles p ON p.applicant_id = a.applicant_id
+    `SELECT p.*, p.profile_id AS applicant_id, p.applicant_status AS status, p.personal_email AS email, c.course_name,
+            u.user_id, sec.section_name,
+            (SELECT GROUP_CONCAT(sub2.code SEPARATOR ', ') 
+             FROM subject_offerings so2 
+             JOIN subjects sub2 ON so2.subject_id = sub2.subject_id 
+             WHERE so2.section_id = sec.section_id) AS subjects_summary
+     FROM profiles p
+     LEFT JOIN courses c ON p.course_id = c.course_id
+     LEFT JOIN users u ON u.user_id = p.user_id
+     LEFT JOIN enrollments e ON e.user_id = u.user_id AND e.status = 'Enrolled'
+     LEFT JOIN sections sec ON e.section_id = sec.section_id
      ${where}
-     ORDER BY a.created_at DESC
+     ORDER BY p.created_at DESC
      LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   );
 
   const [{ total }] = await query<any[]>(
-    `SELECT COUNT(*) AS total FROM applicants a ${where}`,
+    `SELECT COUNT(*) AS total FROM profiles p ${where}`,
     params
   );
 

@@ -46,9 +46,16 @@ export async function generateStudentId(conn: any): Promise<string> {
 }
 
 export function generateDefaultPassword(lastName: string): string {
-  const year = new Date().getFullYear();
-  const name = lastName.charAt(0).toUpperCase() + lastName.slice(1).toLowerCase();
-  return `${name}${year}`;
+  const letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const numbers = '0123456789';
+  let pass = '';
+  for (let i = 0; i < 6; i++) {
+    pass += letters.charAt(Math.floor(Math.random() * letters.length));
+  }
+  for (let i = 0; i < 3; i++) {
+    pass += numbers.charAt(Math.floor(Math.random() * numbers.length));
+  }
+  return pass;
 }
 
 export function computeRemarks(

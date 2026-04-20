@@ -6,21 +6,19 @@ export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   requireRole(req, ['admin']);
   const { id } = await ctx.params;
 
-  const applicants = await query<any[]>(
-    `SELECT a.*, c.course_name, d.department_name,
-            p.first_name, p.last_name, p.middle_name, p.suffix,
-            p.address, p.phone, p.gender, p.date_of_birth
-     FROM applicants a
-     LEFT JOIN courses c ON a.course_id = c.course_id
+  const profiles = await query<any[]>(
+    `SELECT p.*, p.profile_id AS applicant_id, p.applicant_status AS status, p.personal_email AS email,
+            c.course_name, d.department_name
+     FROM profiles p
+     LEFT JOIN courses c ON p.course_id = c.course_id
      LEFT JOIN departments d ON c.dept_id = d.dept_id
-     LEFT JOIN profiles p ON p.applicant_id = a.applicant_id
-     WHERE a.applicant_id = ?`,
+     WHERE p.profile_id = ? AND p.applicant_status IS NOT NULL`,
     [id]
   );
 
-  if (applicants.length === 0) {
+  if (profiles.length === 0) {
     return json({ success: false, message: 'Applicant not found.' }, 404);
   }
 
-  return json({ success: true, data: applicants[0] });
+  return json({ success: true, data: profiles[0] });
 });

@@ -9,7 +9,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
     query<any[]>('SELECT COUNT(*) AS cnt FROM users WHERE role_id = 3 AND is_active = TRUE'),
     query<any[]>('SELECT COUNT(*) AS cnt FROM users WHERE role_id = 2 AND is_active = TRUE'),
     query<any[]>('SELECT COUNT(*) AS cnt FROM sections'),
-    query<any[]>("SELECT COUNT(*) AS cnt FROM applicants WHERE status = 'Pending'"),
+    query<any[]>("SELECT COUNT(*) AS cnt FROM profiles WHERE applicant_status = 'Pending'"),
     query<any[]>('SELECT semester_id, term, school_year, start_date, end_date, status FROM semesters ORDER BY start_date DESC'),
   ]);
 

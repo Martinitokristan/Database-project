@@ -17,26 +17,26 @@ export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   if (!['admin', 'faculty'].includes(role)) throw { status: 403, message: 'Access denied.' };
 
   const { id } = await ctx.params;
+  const offeringId = id; // id is offering_id
 
   if (role === 'faculty') {
-    const section = await query<any[]>('SELECT instructor_id FROM sections WHERE section_id = ?', [id]);
-    if (section.length === 0) return json({ success: false, message: 'Section not found.' }, 404);
-    if (section[0].instructor_id !== payload.user_id) throw { status: 403, message: 'Access denied.' };
+    const offering = await query<any[]>('SELECT instructor_id FROM subject_offerings WHERE offering_id = ?', [offeringId]);
+    if (offering.length === 0 || offering[0].instructor_id !== payload.user_id) throw { status: 403, message: 'Access denied.' };
   }
 
   const grades = await query<any[]>(
     `SELECT e.enrollment_id, e.user_id, e.date_enrolled,
             p.first_name, p.last_name, p.middle_name,
             u.email,
-            g.grade_id, g.prelim_grade, g.midterm_grade, g.final_grade, g.remarks,
+            g.grade_id, g.prelim_grade, g.midterm_grade, g.final_grade, g.remarks, g.is_finalized,
             ROUND((COALESCE(g.prelim_grade,0) + COALESCE(g.midterm_grade,0) + COALESCE(g.final_grade,0)) / 3, 2) AS average
-     FROM enrollments e
+     FROM grades g
+     JOIN enrollments e ON g.enrollment_id = e.enrollment_id
      JOIN users u ON e.user_id = u.user_id
      LEFT JOIN profiles p ON p.user_id = u.user_id
-     LEFT JOIN grades g ON g.enrollment_id = e.enrollment_id
-     WHERE e.section_id = ? AND e.status = 'Enrolled'
+     WHERE g.offering_id = ? AND e.status = 'Enrolled'
      ORDER BY p.last_name, p.first_name`,
-    [id]
+    [offeringId]
   );
 
   return json({ success: true, data: grades });
@@ -48,7 +48,7 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   const role = payload.role_name.toLowerCase();
   if (!['admin', 'faculty'].includes(role)) throw { status: 403, message: 'Access denied.' };
 
-  const { id } = await ctx.params;
+  const { id } = await ctx.params; // id is grade_id
   const body   = await req.json();
   const parsed = UpdateGradeSchema.safeParse(body);
   if (!parsed.success) {
@@ -56,17 +56,20 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   }
 
   const existing = await query<any[]>(
-    `SELECT g.*, e.section_id FROM grades g
-     JOIN enrollments e ON g.enrollment_id = e.enrollment_id
-     WHERE g.enrollment_id = ?`,
+    `SELECT g.*, so.instructor_id 
+     FROM grades g
+     JOIN subject_offerings so ON g.offering_id = so.offering_id
+     WHERE g.grade_id = ?`,
     [id]
   );
   if (existing.length === 0) return json({ success: false, message: 'Grade record not found.' }, 404);
 
   if (role === 'faculty') {
-    const section = await query<any[]>('SELECT instructor_id FROM sections WHERE section_id = ?', [existing[0].section_id]);
-    if (section.length === 0 || section[0].instructor_id !== payload.user_id) {
+    if (existing[0].instructor_id !== payload.user_id) {
       throw { status: 403, message: 'Access denied.' };
+    }
+    if (existing[0].is_finalized) {
+      throw { status: 403, message: 'Grades are finalized and locked. Contact an administrator to make changes.' };
     }
   }
 
@@ -77,7 +80,7 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   const remarks = computeRemarks(prelim, midterm, final);
 
   await query(
-    'UPDATE grades SET prelim_grade = ?, midterm_grade = ?, final_grade = ?, remarks = ? WHERE enrollment_id = ?',
+    'UPDATE grades SET prelim_grade = ?, midterm_grade = ?, final_grade = ?, remarks = ? WHERE grade_id = ?',
     [prelim, midterm, final, remarks, id]
   );
 
@@ -85,10 +88,12 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   try {
     const enrollment = await query<any[]>(
       `SELECT e.user_id, sub.title AS subject_title, sec.section_name
-       FROM enrollments e
-       JOIN sections sec ON sec.section_id = e.section_id
-       JOIN subjects sub ON sub.subject_id  = sec.subject_id
-       WHERE e.enrollment_id = ?`,
+       FROM grades g
+       JOIN enrollments e ON e.enrollment_id = g.enrollment_id
+       JOIN subject_offerings so ON g.offering_id = so.offering_id
+       JOIN sections sec ON sec.section_id = so.section_id
+       JOIN subjects sub ON so.subject_id = sub.subject_id
+       WHERE g.grade_id = ?`,
       [id]
     );
     if (enrollment.length > 0) {

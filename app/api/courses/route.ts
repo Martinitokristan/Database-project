@@ -8,15 +8,28 @@ const CreateCourseSchema = z.object({
   course_name: z.string().min(2).max(255),
 });
 
-export const GET = apiHandler(async (_req: NextRequest) => {
-  const courses = await query<any[]>(
-    `SELECT c.*, d.department_name
-     FROM courses c
-     JOIN departments d ON c.dept_id = d.dept_id
-     ORDER BY d.department_name, c.course_name`
-  );
+export const GET = apiHandler(async (req: NextRequest) => {
+  const { searchParams } = new URL(req.url);
+  const dept_id = searchParams.get('dept_id');
+
+  let sql = `
+    SELECT c.*, d.department_name
+    FROM courses c
+    JOIN departments d ON c.dept_id = d.dept_id
+  `;
+  const params: any[] = [];
+
+  if (dept_id) {
+    sql += ' WHERE c.dept_id = ?';
+    params.push(dept_id);
+  }
+
+  sql += ' ORDER BY d.department_name, c.course_name';
+
+  const courses = await query<any[]>(sql, params);
   return json({ success: true, data: courses });
 });
+
 
 export const POST = apiHandler(async (req: NextRequest) => {
   requireRole(req, ['admin']);

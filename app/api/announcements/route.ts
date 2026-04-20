@@ -40,7 +40,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
        LEFT JOIN sections sec ON a.section_id = sec.section_id
        LEFT JOIN roles r ON a.target_role_id = r.role_id
        WHERE (a.type = 'General' AND (a.target_role_id IS NULL OR a.target_role_id = ?))
-          OR (a.type = 'Section' AND sec.instructor_id = ?)
+          OR (a.type = 'Section' AND EXISTS (SELECT 1 FROM subject_offerings so WHERE so.section_id = a.section_id AND so.instructor_id = ?))
        ORDER BY a.created_at DESC`,
       [roleId, userId]
     );
@@ -84,8 +84,8 @@ export const POST = apiHandler(async (req: NextRequest) => {
   }
 
   if (type === 'Section' && section_id && role === 'faculty') {
-    const section = await query<any[]>('SELECT instructor_id FROM sections WHERE section_id = ?', [section_id]);
-    if (section.length === 0 || section[0].instructor_id !== payload.user_id) {
+    const offering = await query<any[]>('SELECT offering_id FROM subject_offerings WHERE section_id = ? AND instructor_id = ? LIMIT 1', [section_id, payload.user_id]);
+    if (offering.length === 0) {
       throw { status: 403, message: 'You can only post to your own sections.' };
     }
   }

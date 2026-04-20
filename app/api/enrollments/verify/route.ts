@@ -20,12 +20,12 @@ export const POST = apiHandler(async (req: NextRequest) => {
   const { applicant_id, section_id } = parsed.data;
 
   const studentId = await transaction(async (conn) => {
-    const [apps] = await conn.execute(
-      'SELECT * FROM applicants WHERE applicant_id = ? AND status = "Pending" FOR UPDATE',
+    const [profiles] = await conn.execute(
+      'SELECT * FROM profiles WHERE profile_id = ? AND applicant_status = "Pending" FOR UPDATE',
       [applicant_id]
     ) as any;
-    const applicant = (apps as any[])[0];
-    if (!applicant) throw { status: 404, message: 'Applicant not found or already processed.' };
+    const profile = (profiles as any[])[0];
+    if (!profile) throw { status: 404, message: 'Applicant not found or already processed.' };
 
     const [sections] = await conn.execute(
       `SELECT s.*, COUNT(e.enrollment_id) AS enrolled_count
@@ -38,16 +38,26 @@ export const POST = apiHandler(async (req: NextRequest) => {
     ) as any;
     const section = (sections as any[])[0];
     if (!section) throw { status: 404, message: 'Section not found.' };
+    
+    // Prerequisite logic — check all offerings in this section
+    const [offeringsPrereqs] = await conn.execute(
+      `SELECT sub.code, sub.title FROM subject_offerings so
+       JOIN subjects sub ON so.subject_id = sub.subject_id
+       WHERE so.section_id = ? AND sub.prerequisite_id IS NOT NULL`,
+      [section_id]
+    ) as any;
+
+    if ((offeringsPrereqs as any[]).length > 0) {
+      const first = (offeringsPrereqs as any[])[0];
+      throw { 
+        status: 403, 
+        message: `Prerequisite not met. This section contains advanced subjects like ${first.code} — ${first.title}.` 
+      };
+    }
+
     if (Number(section.enrolled_count) >= section.capacity) {
       throw { status: 409, message: 'Section is at full capacity.' };
     }
-
-    const [profiles] = await conn.execute(
-      'SELECT * FROM profiles WHERE applicant_id = ?',
-      [applicant_id]
-    ) as any;
-    const profile = (profiles as any[])[0];
-    if (!profile) throw { status: 404, message: 'Applicant profile not found.' };
 
     const userId  = await generateStudentId(conn);
     const plain   = generateDefaultPassword(profile.last_name);
@@ -55,11 +65,11 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
     await conn.execute(
       'INSERT INTO users (user_id, email, password_hash, role_id, must_change_password) VALUES (?, ?, ?, 3, TRUE)',
-      [userId, applicant.email, hashed]
+      [userId, profile.personal_email, hashed]
     );
 
     await conn.execute(
-      'UPDATE profiles SET user_id = ?, applicant_id = NULL WHERE applicant_id = ?',
+      'UPDATE profiles SET user_id = ?, applicant_status = "Enrolled" WHERE profile_id = ?',
       [userId, applicant_id]
     );
 
@@ -70,15 +80,19 @@ export const POST = apiHandler(async (req: NextRequest) => {
     ) as any;
     const enrollmentId = (enrollment as any).insertId;
 
-    await conn.execute(
-      'INSERT INTO grades (enrollment_id) VALUES (?)',
-      [enrollmentId]
-    );
+    const [offerings] = await conn.execute(
+      'SELECT offering_id FROM subject_offerings WHERE section_id = ?',
+      [section_id]
+    ) as any;
 
-    await conn.execute(
-      'UPDATE applicants SET status = "Enrolled" WHERE applicant_id = ?',
-      [applicant_id]
-    );
+    if (offerings.length > 0) {
+      for (const offering of offerings) {
+        await conn.execute(
+          'INSERT INTO grades (enrollment_id, offering_id) VALUES (?, ?)',
+          [enrollmentId, offering.offering_id]
+        );
+      }
+    }
 
     return { userId, plain, profile, sectionData: section };
   });
@@ -86,32 +100,34 @@ export const POST = apiHandler(async (req: NextRequest) => {
   const { userId, plain, profile, sectionData } = studentId as any;
 
   const sectionInfo = await query<any[]>(
-    `SELECT s.section_name, sub.title AS subject_title,
-            sem.term, sem.school_year
+    `SELECT s.section_name, sem.term, sem.school_year
      FROM sections s
-     JOIN subjects sub ON s.subject_id = sub.subject_id
      JOIN semesters sem ON s.semester_id = sem.semester_id
      WHERE s.section_id = ?`,
     [section_id]
   );
 
-  const applicantRow = await query<any[]>(
-    'SELECT email FROM applicants WHERE applicant_id = ?',
-    [applicant_id]
+  const offeringsList = await query<any[]>(
+    `SELECT sub.title FROM subject_offerings so
+     JOIN subjects sub ON so.subject_id = sub.subject_id
+     WHERE so.section_id = ?`,
+    [section_id]
   );
+
+  const subjects = offeringsList.map(o => o.title);
 
   const info = sectionInfo[0];
   sendEmail({
-    to: { email: applicantRow[0]?.email, name: `${profile.first_name} ${profile.last_name}` },
+    to: { email: profile.personal_email, name: `${profile.first_name} ${profile.last_name}` },
     subject: 'AcadTrack — Enrollment Approved',
     htmlContent: buildEnrollmentEmail({
       firstName: profile.first_name,
       lastName:  profile.last_name,
       studentId: userId,
-      email:     applicantRow[0]?.email,
+      email:     profile.personal_email,
       password:  plain,
       section:   info?.section_name  ?? '',
-      subject:   info?.subject_title ?? '',
+      subjects:  subjects,
       semester:  info ? `${info.term} ${info.school_year}` : '',
     }),
   }).catch(err => console.error('[Enrollment Email]', err));

@@ -5,12 +5,13 @@ import { requireAuth, requireRole, apiHandler, json } from '@/lib/middleware';
 async function getAssessment(id: number, userId: string, roleName: string) {
   const [rows] = await pool.execute(`
     SELECT a.*,
-      sec.section_name, sec.instructor_id,
+      sec.section_name, so.instructor_id,
       sub.code AS subject_code, sub.title AS subject_title,
       (SELECT COUNT(*) FROM assessment_questions WHERE assessment_id = a.assessment_id) AS question_count
     FROM assessments a
-    JOIN sections sec ON sec.section_id = a.section_id
-    JOIN subjects sub ON sub.subject_id = sec.subject_id
+    JOIN subject_offerings so ON so.offering_id = a.offering_id
+    JOIN sections sec ON sec.section_id = so.section_id
+    JOIN subjects sub ON sub.subject_id = so.subject_id
     WHERE a.assessment_id = ?
   `, [id]) as any;
   if (!rows.length) throw { status: 404, message: 'Assessment not found.' };

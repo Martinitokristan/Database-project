@@ -20,9 +20,9 @@ export default function HomePage() {
 }
 
 function FacultyHome({ user }: { user: any }) {
-  const [sections, setSections]       = useState<any[]>([]);
+  const [sections, setSections] = useState<any[]>([]);
   const [allSchedules, setAllSchedules] = useState<any[]>([]);
-  const [loading, setLoading]         = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
@@ -39,7 +39,7 @@ function FacultyHome({ user }: { user: any }) {
     load();
   }, []);
 
-  const today    = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const todayDay = new Date().toLocaleDateString('en-US', { weekday: 'long' });
   const todaySchedules = allSchedules.filter((s: any) => s.day_of_week === todayDay).sort((a: any, b: any) => a.start_time.localeCompare(b.start_time));
 
@@ -82,7 +82,7 @@ function FacultyHome({ user }: { user: any }) {
                   <div className="flex items-start gap-2">
                     <Clock className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-sm font-medium">{sch.start_time?.slice(0,5)} – {sch.end_time?.slice(0,5)}</p>
+                      <p className="text-sm font-medium">{sch.start_time?.slice(0, 5)} – {sch.end_time?.slice(0, 5)}</p>
                       <p className="text-xs text-muted-foreground">{sch.section?.section_name} · {sch.room}</p>
                     </div>
                   </div>
@@ -98,8 +98,8 @@ function FacultyHome({ user }: { user: any }) {
 
 function StudentHome({ user }: { user: any }) {
   const [enrollments, setEnrollments] = useState<any[]>([]);
-  const [semester, setSemester]       = useState<any>(null);
-  const [loading, setLoading]         = useState(true);
+  const [semester, setSemester] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {

@@ -27,8 +27,8 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
 /* ─── Faculty Results ───────────────────────────────────────────── */
 function FacultyResults({ id }: { id: number }) {
   const router = useRouter();
-  const [results, setResults]   = useState<any[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [results, setResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<any | null>(null);
   const [overrideQ, setOverrideQ] = useState<any | null>(null);
 
@@ -119,15 +119,15 @@ function FacultyResults({ id }: { id: number }) {
       {/* Attempt detail dialog */}
       {selected && (
         <Dialog open onOpenChange={() => setSelected(null)}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent aria-describedby={undefined} className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{selected.last_name}, {selected.first_name} — Attempt {selected.attempt_no}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div className="flex gap-6 text-sm">
                 <div><p className="text-muted-foreground text-xs">Score</p><p className="font-bold text-lg">{selected.score}/{selected.max_score}</p></div>
-                {selected.max_score > 0 && <div><p className="text-muted-foreground text-xs">Percentage</p><p className={cn('font-bold text-lg', ((selected.score/selected.max_score)*100) >= 75 ? 'text-green-600' : 'text-red-600')}>{Math.round((selected.score/selected.max_score)*100)}%</p></div>}
-                {selected.time_spent && <div><p className="text-muted-foreground text-xs">Time Spent</p><p className="font-semibold">{Math.floor(selected.time_spent/60)}m {selected.time_spent%60}s</p></div>}
+                {selected.max_score > 0 && <div><p className="text-muted-foreground text-xs">Percentage</p><p className={cn('font-bold text-lg', ((selected.score / selected.max_score) * 100) >= 75 ? 'text-green-600' : 'text-red-600')}>{Math.round((selected.score / selected.max_score) * 100)}%</p></div>}
+                {selected.time_spent && <div><p className="text-muted-foreground text-xs">Time Spent</p><p className="font-semibold">{Math.floor(selected.time_spent / 60)}m {selected.time_spent % 60}s</p></div>}
               </div>
               <div className="space-y-3">
                 {(selected.responses ?? []).map((resp: any, i: number) => (
@@ -192,7 +192,7 @@ function FacultyResults({ id }: { id: number }) {
 function OverrideDialog({ response, onClose, onSave }: {
   response: any; onClose: () => void; onSave: (id: number, pts: number) => Promise<void>;
 }) {
-  const [pts, setPts]     = useState(String(response.points_earned ?? 0));
+  const [pts, setPts] = useState(String(response.points_earned ?? 0));
   const [saving, setSaving] = useState(false);
 
   async function handle() {
@@ -207,7 +207,7 @@ function OverrideDialog({ response, onClose, onSave }: {
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-sm">
+      <DialogContent aria-describedby={undefined} className="max-w-sm">
         <DialogHeader><DialogTitle>Override Grade</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground line-clamp-2">{response.question_text}</p>
@@ -232,8 +232,8 @@ function OverrideDialog({ response, onClose, onSave }: {
 function StudentResults({ id }: { id: number }) {
   const router = useRouter();
   const [attempts, setAttempts] = useState<any[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [blocked, setBlocked]   = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
     assessmentService.getResults(id).then(res => {
@@ -285,8 +285,8 @@ function StudentResults({ id }: { id: number }) {
                     {(att.responses ?? []).map((resp: any, i: number) => (
                       <div key={resp.response_id} className={cn('rounded-lg border p-3',
                         resp.is_correct ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/10'
-                        : resp.is_correct === false ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/10'
-                        : 'border-muted'
+                          : resp.is_correct === false ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/10'
+                            : 'border-muted'
                       )}>
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2">

@@ -6,11 +6,12 @@ export const GET = apiHandler(async (req: NextRequest) => {
   requireRole(req, ['admin']);
 
   const { searchParams } = req.nextUrl;
-  const search   = searchParams.get('search') || '';
-  const role     = searchParams.get('role') || '';
-  const page     = parseInt(searchParams.get('page') || '1');
-  const limit    = parseInt(searchParams.get('limit') || '20');
-  const offset   = (page - 1) * limit;
+  const search     = searchParams.get('search') || '';
+  const role       = searchParams.get('role') || '';
+  const year_level = searchParams.get('year_level') || '';
+  const page       = parseInt(searchParams.get('page') || '1');
+  const limit      = parseInt(searchParams.get('limit') || '20');
+  const offset     = (page - 1) * limit;
 
   let whereClauses: string[] = [];
   let params: any[] = [];
@@ -23,18 +24,27 @@ export const GET = apiHandler(async (req: NextRequest) => {
     whereClauses.push('r.role_name = ?');
     params.push(role);
   }
+  if (year_level) {
+    whereClauses.push('p.year_level = ?');
+    params.push(year_level);
+  }
 
   const where = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
   const users = await query<any[]>(
-    `SELECT u.user_id, u.email, u.role_id, u.must_change_password, u.created_at,
+    `SELECT u.user_id, u.email, u.role_id, u.must_change_password, u.is_active, u.created_at,
             r.role_name,
-            p.first_name, p.last_name, p.middle_name, p.gender, p.phone
+            p.first_name, p.last_name, p.middle_name, p.suffix,
+            p.gender, p.phone, p.address, p.date_of_birth,
+            p.year_level, p.academic_status,
+            e.section_id
      FROM users u
      JOIN roles r ON u.role_id = r.role_id
      LEFT JOIN profiles p ON p.user_id = u.user_id
+     LEFT JOIN enrollments e ON e.user_id = u.user_id
+       AND e.enrollment_id = (SELECT MAX(enrollment_id) FROM enrollments WHERE user_id = u.user_id)
      ${where}
-     ORDER BY u.created_at DESC
+     ORDER BY p.last_name ASC, p.first_name ASC
      LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   );

@@ -7,7 +7,7 @@ export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   const payload = requireAuth(req);
 
   const [aRows] = await pool.execute(
-    'SELECT assessment_id, created_by, show_results, section_id FROM assessments WHERE assessment_id = ?', [id]
+    'SELECT a.assessment_id, a.created_by, a.show_results, so.section_id FROM assessments a JOIN subject_offerings so ON a.offering_id = so.offering_id WHERE a.assessment_id = ?', [id]
   ) as any;
   if (!aRows.length) throw { status: 404, message: 'Assessment not found.' };
   const assessment = aRows[0];

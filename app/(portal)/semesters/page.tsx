@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,19 +13,23 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { useAuth } from '@/hooks/useAuth';
 import { semesterService } from '@/services/semesterService';
+import { sectionService } from '@/services/sectionService';
 import { profileService } from '@/services/profileService';
+import { subjectService } from '@/services/subjectService';
+import { userService } from '@/services/userService';
 import { toast } from 'sonner';
 import {
   CalendarRange, Clock, User, Star,
   CheckCircle, XCircle, AlertCircle,
   Plus, Pencil, Trash2, Loader2, ChevronDown, ChevronRight,
-  BookOpen, Users, FileDown, Bell,
+  BookOpen, BookMarked, Users, FileDown, Bell, Eye, Archive, Layers,
 } from 'lucide-react';
 
 /* ─── Zod schema for admin form ─────────────────────────── */
@@ -85,6 +90,7 @@ function formatSchedules(schedules: any[]): string[] {
 ═══════════════════════════════════════════════════════════ */
 function AdminSemestersView() {
   const [semesters, setSemesters]     = useState<any[]>([]);
+  const [allSections, setAllSections] = useState<any[]>([]);
   const [loading, setLoading]         = useState(true);
   const [open, setOpen]               = useState(false);
   const [editing, setEditing]         = useState<any>(null);
@@ -94,6 +100,13 @@ function AdminSemestersView() {
   const [notifyTarget, setNotifyTarget] = useState<any>(null);
   const [notifyType, setNotifyType]     = useState<'midterm' | 'final'>('midterm');
   const [notifying, setNotifying]       = useState(false);
+  const [activeTab, setActiveTab]       = useState('semesters');
+  
+  // For Add Section inside Semesters Page
+  const [addSectionOpen, setAddSectionOpen] = useState(false);
+  const [viewSectionTarget, setViewSectionTarget] = useState<any>(null);
+  const [subjects, setSubjects]             = useState<any[]>([]);
+  const [faculty, setFaculty]               = useState<any[]>([]);
   const [notifyDone, setNotifyDone]     = useState<{ sent: number; faculty: string[] } | null>(null);
 
   const { register, handleSubmit, setValue, reset, watch, formState: { errors } } = useForm<FormData>({
@@ -104,8 +117,16 @@ function AdminSemestersView() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await semesterService.list();
-    if (res.success) setSemesters(res.data ?? []);
+    const [semRes, secRes, subRes, facRes] = await Promise.all([
+      semesterService.list(),
+      sectionService.list(),
+      subjectService.list(),
+      userService.list({ role: 'Faculty', limit: 100 })
+    ]);
+    if (semRes.success) setSemesters(semRes.data ?? []);
+    if (secRes.success) setAllSections(secRes.data ?? []);
+    if (subRes.success) setSubjects(subRes.data ?? []);
+    if (facRes.success) setFaculty(facRes.data?.users ?? []);
     setLoading(false);
   }, []);
 
@@ -179,78 +200,285 @@ function AdminSemestersView() {
   return (
     <div>
       <PageHeader
-        title="Semesters"
-        description={active ? `Active: ${active.term} ${active.school_year}` : 'No active semester'}
-        action={<Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Add Semester</Button>}
+        title="Semesters & Sections"
+        description={active ? `Active Term: ${active.term} ${active.school_year}` : 'Manage academic terms and section archives'}
+        action={
+          activeTab === 'semesters' ? (
+            <Button onClick={openCreate} className="bg-blue-600 hover:bg-blue-700 shadow-md">
+              <Plus className="mr-2 h-4 w-4" />Add Semester
+            </Button>
+          ) : (
+            <Button onClick={() => setAddSectionOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 shadow-md">
+              <Plus className="mr-2 h-4 w-4" />Add Section
+            </Button>
+          )
+        }
       />
-      <Card>
-        <CardContent className="pt-4">
-          {loading ? <LoadingSpinner /> : semesters.length === 0 ? <EmptyState title="No semesters yet" /> : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Term</TableHead>
-                  <TableHead>School Year</TableHead>
-                  <TableHead>Start Date</TableHead>
-                  <TableHead>End Date</TableHead>
-                  <TableHead>Midterm Deadline</TableHead>
-                  <TableHead>Final Deadline</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-32" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {semesters.map(s => (
-                  <TableRow key={s.semester_id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <CalendarRange className="h-4 w-4 text-muted-foreground" />
-                        {s.term}
-                      </div>
-                    </TableCell>
-                    <TableCell>{s.school_year}</TableCell>
-                    <TableCell className="text-sm">{s.start_date?.slice(0, 10)}</TableCell>
-                    <TableCell className="text-sm">{s.end_date?.slice(0, 10)}</TableCell>
-                    <TableCell className="text-sm">
-                      {s.midterm_deadline
-                        ? <span className="font-medium text-orange-600">{s.midterm_deadline.slice(0, 10)}</span>
-                        : <span className="text-muted-foreground">—</span>}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {s.final_deadline
-                        ? <span className="font-medium text-red-600">{s.final_deadline.slice(0, 10)}</span>
-                        : <span className="text-muted-foreground">—</span>}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={s.status === 'Active' ? 'default' : s.status === 'Closed' ? 'destructive' : 'secondary'}>
-                        {s.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="flex gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => openEdit(s)} title="Edit">
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" variant="ghost"
-                        onClick={() => { setNotifyTarget(s); setNotifyType('midterm'); setNotifyDone(null); }}
-                        disabled={!s.midterm_deadline && !s.final_deadline}
-                        title="Notify Faculty">
-                        <Bell className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="text-destructive"
-                        onClick={() => setDeleteTarget(s)} disabled={s.status === 'Active'} title="Delete">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <div className="flex items-center justify-between">
+          <TabsList>
+            <TabsTrigger value="semesters">Semesters</TabsTrigger>
+            <TabsTrigger value="sections">Section Management</TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="semesters" className="m-0">
+          <Card>
+            <CardContent className="pt-4">
+              {loading ? <LoadingSpinner /> : semesters.length === 0 ? <EmptyState title="No semesters yet" /> : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Term</TableHead>
+                      <TableHead>School Year</TableHead>
+                      <TableHead>Start Date</TableHead>
+                      <TableHead>End Date</TableHead>
+                      <TableHead>Midterm Deadline</TableHead>
+                      <TableHead>Final Deadline</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-32" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {semesters.map(s => (
+                      <TableRow key={s.semester_id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <CalendarRange className="h-4 w-4 text-muted-foreground" />
+                            {s.term}
+                          </div>
+                        </TableCell>
+                        <TableCell>{s.school_year}</TableCell>
+                        <TableCell className="text-sm">{s.start_date?.slice(0, 10)}</TableCell>
+                        <TableCell className="text-sm">{s.end_date?.slice(0, 10)}</TableCell>
+                        <TableCell className="text-sm">
+                          {s.midterm_deadline
+                            ? <span className="font-medium text-orange-600">{s.midterm_deadline.slice(0, 10)}</span>
+                            : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {s.final_deadline
+                            ? <span className="font-medium text-red-600">{s.final_deadline.slice(0, 10)}</span>
+                            : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={s.status === 'Active' ? 'default' : s.status === 'Closed' ? 'destructive' : 'secondary'}>
+                            {s.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="flex gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => openEdit(s)} title="Edit">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost"
+                            onClick={() => { setNotifyTarget(s); setNotifyType('midterm'); setNotifyDone(null); }}
+                            disabled={!s.midterm_deadline && !s.final_deadline}
+                            title="Notify Faculty">
+                            <Bell className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="text-destructive"
+                            onClick={() => setDeleteTarget(s)} disabled={s.status === 'Active'} title="Delete">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="sections" className="m-0">
+          <Card>
+            <CardContent className="pt-4">
+              {loading ? <LoadingSpinner /> : allSections.length === 0 ? <EmptyState title="No sections defined" /> : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Section</TableHead>
+                      <TableHead>Capacity</TableHead>
+                      <TableHead>Semester</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-24" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allSections.map(sec => (
+                      <TableRow key={sec.section_id} className={sec.is_archived ? "opacity-60 bg-muted/20" : ""}>
+                        <TableCell className="font-medium font-mono text-xs">{sec.section_name}</TableCell>
+                        <TableCell className="text-xs">
+                          {sec.enrolled_count} / {sec.capacity}
+                        </TableCell>
+                        <TableCell className="text-xs">{sec.school_year} - {sec.term}</TableCell>
+                        <TableCell>
+                          <Badge variant={sec.is_archived ? "secondary" : "default"} className={!sec.is_archived ? "bg-emerald-500 hover:bg-emerald-500" : ""}>
+                            {sec.is_archived ? 'Archived' : 'Active'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="hover:bg-indigo-50 transition-all font-semibold text-indigo-600 gap-1.5"
+                            onClick={() => setViewSectionTarget(sec)}
+                          >
+                            <Eye className="h-4 w-4" />
+                            View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+          </TableBody>
+        </Table>
+      )}
+    </CardContent>
+  </Card>
+</TabsContent>
+
+{/* ── Global Add Section Dialog ── */}
+<Dialog open={addSectionOpen} onOpenChange={setAddSectionOpen}>
+  <DialogContent className="sm:max-w-[425px]">
+    <DialogHeader>
+      <DialogTitle>Add New Section</DialogTitle>
+    </DialogHeader>
+    <form className="space-y-4 py-4" onSubmit={async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        setSaving(true);
+        try {
+          const res = await fetch('/api/sections', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              semester_id: Number(fd.get('semester_id')),
+              section_name: fd.get('section_name'),
+              capacity: Number(fd.get('capacity') || 40)
+            })
+          }).then(r => r.json());
+
+          if (res.success) {
+            toast.success('Section created successfully.');
+            setAddSectionOpen(false);
+            load();
+          } else toast.error(res.message);
+        } catch (err) {
+          toast.error('Failed to create section.');
+        } finally {
+          setSaving(false);
+        }
+      }}>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Term</Label>
+            <Select name="semester_id" required>
+              <SelectTrigger><SelectValue placeholder="Select term..." /></SelectTrigger>
+              <SelectContent>
+                {semesters.map(s => <SelectItem key={s.semester_id} value={String(s.semester_id)}>{s.school_year} - {s.term}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Section Name</Label>
+            <Input name="section_name" placeholder="e.g., BSIT 1-A" required />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Capacity</Label>
+            <Input name="capacity" type="number" defaultValue={40} required />
+          </div>
+        </div>
+
+        <DialogFooter className="pt-2">
+          <Button type="button" variant="outline" onClick={() => setAddSectionOpen(false)}>Cancel</Button>
+          <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700">Save Section</Button>
+        </DialogFooter>
+    </form>
+  </DialogContent>
+</Dialog>
+
+      {/* ── Section Eyeview Modal ── */}
+      <Dialog open={!!viewSectionTarget} onOpenChange={o => !o && setViewSectionTarget(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Section Details</DialogTitle>
+          </DialogHeader>
+          {viewSectionTarget && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <Label className="text-muted-foreground">Section Name</Label>
+                  <p className="font-bold text-lg">{viewSectionTarget.section_name}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Status</Label>
+                  <div>
+                    <Badge variant={viewSectionTarget.is_archived ? "secondary" : "default"}>
+                      {viewSectionTarget.is_archived ? 'Archived' : 'Active'}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Enrollment</Label>
+                  <p className="font-medium">{viewSectionTarget.enrolled_count} / {viewSectionTarget.capacity}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Term</Label>
+                  <p className="font-medium">{viewSectionTarget.school_year} - {viewSectionTarget.term}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-4 border-t">
+                <Button asChild variant="outline" className="w-full justify-start gap-2 h-10 border-indigo-100 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-all">
+                  <Link href={`/sections/${viewSectionTarget.section_id}`}>
+                    <Layers className="h-4 w-4" />
+                    View Full Schedule & Classes
+                  </Link>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start gap-2"
+                  onClick={async () => {
+                    const res = await sectionService.update(viewSectionTarget.section_id, { is_archived: !viewSectionTarget.is_archived });
+                    if (res.success) {
+                      toast.success(viewSectionTarget.is_archived ? 'Section restored.' : 'Section archived.');
+                      setViewSectionTarget(null);
+                      load();
+                    } else toast.error(res.message);
+                  }}
+                >
+                  <Archive className="h-4 w-4" />
+                  {viewSectionTarget.is_archived ? 'Restore Section' : 'Archive Section'}
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  className="w-full justify-start gap-2"
+                  onClick={async () => {
+                    if (confirm('Delete this section permanently?')) {
+                      const res = await sectionService.remove(viewSectionTarget.section_id);
+                      if (res.success) { 
+                        toast.success('Section deleted'); 
+                        setViewSectionTarget(null);
+                        load(); 
+                      } else toast.error(res.message);
+                    }
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete Section
+                </Button>
+              </div>
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
+
+      </Tabs>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{editing ? 'Edit Semester' : 'Add Semester'}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
@@ -332,7 +560,7 @@ function AdminSemestersView() {
 
       {/* ── Notify Faculty Dialog ── */}
       <Dialog open={!!notifyTarget} onOpenChange={o => { if (!o) { setNotifyTarget(null); setNotifyDone(null); } }}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Bell className="h-5 w-5 text-orange-500" />
@@ -812,7 +1040,7 @@ function FacultySemestersView() {
                     : (
                       <div className="space-y-3">
                         {sem.sections.map((sec: any) => (
-                          <div key={sec.section_id} className="rounded-lg border bg-muted/30 p-4">
+                          <div key={sec.offering_id} className="rounded-lg border bg-muted/30 p-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div className="space-y-2">
                                 <div className="flex items-center gap-2 flex-wrap">

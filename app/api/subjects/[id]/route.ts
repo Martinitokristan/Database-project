@@ -8,6 +8,8 @@ const UpdateSubjectSchema = z.object({
   code:         z.string().min(1).max(50).optional(),
   title:        z.string().min(2).max(255).optional(),
   credit_units: z.number().int().min(1).optional(),
+  year_level:   z.enum(['1st Year','2nd Year','3rd Year','4th Year','Masteral','Doctorate','Irregular']).optional(),
+  subject_type: z.enum(['Major', 'Minor']).optional(),
 });
 
 export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
@@ -46,8 +48,8 @@ export const DELETE = apiHandler(async (req: NextRequest, ctx: { params: Promise
   const existing = await query<any[]>('SELECT subject_id FROM subjects WHERE subject_id = ?', [id]);
   if (existing.length === 0) return json({ success: false, message: 'Subject not found.' }, 404);
 
-  const inUse = await query<any[]>('SELECT section_id FROM sections WHERE subject_id = ? LIMIT 1', [id]);
-  if (inUse.length > 0) return json({ success: false, message: 'Cannot delete: subject has associated sections.' }, 409);
+  const inUse = await query<any[]>('SELECT offering_id FROM subject_offerings WHERE subject_id = ? LIMIT 1', [id]);
+  if (inUse.length > 0) return json({ success: false, message: 'Cannot delete: subject has associated offerings.' }, 409);
 
   await query('DELETE FROM subjects WHERE subject_id = ?', [id]);
   return json({ success: true, message: 'Subject deleted.' });

@@ -6,21 +6,21 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   requireRole(req, ['admin']);
   const { id } = await ctx.params;
 
-  const applicants = await query<any[]>(
-    'SELECT * FROM applicants WHERE applicant_id = ?',
+  const profiles = await query<any[]>(
+    'SELECT * FROM profiles WHERE profile_id = ? AND applicant_status IS NOT NULL',
     [id]
   );
 
-  if (applicants.length === 0) {
+  if (profiles.length === 0) {
     return json({ success: false, message: 'Applicant not found.' }, 404);
   }
 
-  if (applicants[0].status !== 'Pending') {
+  if (profiles[0].applicant_status !== 'Pending') {
     return json({ success: false, message: 'Only pending applicants can be rejected.' }, 409);
   }
 
   await query(
-    'UPDATE applicants SET status = "Rejected" WHERE applicant_id = ?',
+    'UPDATE profiles SET applicant_status = "Rejected" WHERE profile_id = ?',
     [id]
   );
 

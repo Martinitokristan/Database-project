@@ -11,9 +11,10 @@ export const GET = apiHandler(async (req: NextRequest) => {
             sub.code AS subject_code, sub.title AS subject_title,
             p.first_name AS instructor_first, p.last_name AS instructor_last
      FROM schedules sch
-     JOIN sections sec ON sch.section_id = sec.section_id
-     JOIN subjects sub ON sec.subject_id = sub.subject_id
-     JOIN users u ON sec.instructor_id = u.user_id
+     JOIN subject_offerings so ON sch.offering_id = so.offering_id
+     JOIN sections sec ON so.section_id = sec.section_id
+     JOIN subjects sub ON so.subject_id = sub.subject_id
+     JOIN users u ON so.instructor_id = u.user_id
      LEFT JOIN profiles p ON p.user_id = u.user_id
      JOIN enrollments e ON e.section_id = sec.section_id
      WHERE e.user_id = ? AND e.status = 'Enrolled'

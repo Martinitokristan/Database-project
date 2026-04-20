@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { sectionService } from '@/services/sectionService';
 import { scheduleService } from '@/services/scheduleService';
+import { subjectService } from '@/services/subjectService';
 import { toast } from 'sonner';
 import { Plus, Trash2, Loader2, ArrowLeft, FileDown } from 'lucide-react';
 import Link from 'next/link';
@@ -25,48 +26,101 @@ const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sun
 export default function SectionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [section, setSection]     = useState<any>(null);
-  const [schedules, setSchedules] = useState<any[]>([]);
+  const [offerings, setOfferings] = useState<any[]>([]);
   const [students, setStudents]   = useState<any[]>([]);
   const [loading, setLoading]     = useState(true);
-  const [schedOpen, setSchedOpen] = useState(false);
+  
   const [addStudentOpen, setAddStudentOpen] = useState(false);
-  const [saving, setSaving]       = useState(false);
+  const [addOfferingOpen, setAddOfferingOpen] = useState(false);
   const [studentId, setStudentId] = useState('');
   const [removeTarget, setRemoveTarget] = useState<any>(null);
   const [removing, setRemoving]   = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [saving, setSaving]       = useState(false);
 
-  const [schedForm, setSchedForm] = useState({
-    day_of_week: 'Monday', start_time: '08:00', end_time: '09:00', room: '',
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [faculties, setFaculties] = useState<any[]>([]);
+
+  const [offeringForm, setOfferingForm] = useState({
+    subject_id: '',
+    instructor_id: '',
+    day_of_week: 'Monday & Thursday',
+    room: '',
+    start_time: '',
+    end_time: ''
   });
-
+  
   const load = useCallback(async () => {
     setLoading(true);
-    const [sr, schr, gr] = await Promise.all([
+    const [sr, er, or, subr, facr] = await Promise.all([
       sectionService.get(Number(id)),
-      sectionService.getSchedules(Number(id)),
-      fetch(`/api/grades/${id}`, { credentials: 'include' }).then(r => r.json()),
+      sectionService.getEnrollments(Number(id)),
+      fetch(`/api/subject-offerings?section_id=${id}`).then(r => r.json()),
+      subjectService.list(),
+      fetch('/api/users?role=faculty').then(r => r.json())
     ]);
     if (sr.success) setSection(sr.data);
-    if (schr.success) setSchedules(schr.data ?? []);
-    if (gr.success) setStudents(gr.data ?? []);
+    if (er.success) setStudents(er.data ?? []);
+    if (or.success) setOfferings(or.data ?? []);
+    if (subr.success) setSubjects(subr.data ?? []);
+    if (facr.success) setFaculties(facr.data?.users ?? []);
     setLoading(false);
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
 
-  async function handleAddSchedule() {
+  async function handleAddOffering() {
+    if (!offeringForm.subject_id) return toast.error('Subject is required.');
     setSaving(true);
-    const res = await scheduleService.create({ section_id: Number(id), ...schedForm });
+    const payload = {
+      section_id: Number(id),
+      subject_id: Number(offeringForm.subject_id),
+      instructor_id: offeringForm.instructor_id || undefined,
+    };
+    
+    // In a real app we'd map this to subjectOfferingService.create()
+    const res = await fetch('/api/subject-offerings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(r => r.json());
+    
     setSaving(false);
     if (!res.success) { toast.error(res.message); return; }
-    toast.success('Schedule added.'); setSchedOpen(false); load();
-  }
+    
+    // 2. Create Schedule(s)
+    const dayValue = offeringForm.day_of_week;
+    const days = dayValue.includes('&') 
+      ? dayValue.split('&').map(d => d.trim()) 
+      : [dayValue];
 
-  async function handleDeleteSchedule(schedId: number) {
-    const res = await scheduleService.remove(schedId);
-    if (!res.success) { toast.error(res.message); return; }
-    toast.success('Schedule removed.'); load();
+    let successCount = 0;
+    for (const day of days) {
+      const schRes = await fetch('/api/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          offering_id: res.data.offering_id,
+          day_of_week: day,
+          start_time: offeringForm.start_time,
+          end_time: offeringForm.end_time,
+          room: offeringForm.room,
+          // We can use the section's semester dates if available or leave null for defaults
+        })
+      }).then(r => r.json());
+
+      if (schRes.success) successCount++;
+      else toast.warning(`Offering created, but failed to schedule ${day}: ${schRes.message}`);
+    }
+
+    if (successCount === days.length) {
+      toast.success('Subject offering and schedules added.');
+    } else {
+      toast.success('Subject offering added with some scheduling issues.');
+    }
+
+    setAddOfferingOpen(false);
+    setOfferingForm({ subject_id: '', instructor_id: '', day_of_week: 'Monday & Thursday', room: '', start_time: '', end_time: '' });
+    load();
   }
 
   async function handleAddStudent() {
@@ -75,7 +129,8 @@ export default function SectionDetailPage({ params }: { params: Promise<{ id: st
     const res = await sectionService.addStudent(Number(id), { user_id: studentId.trim() });
     setSaving(false);
     if (!res.success) { toast.error(res.message); return; }
-    toast.success('Student added.'); setStudentId(''); setAddStudentOpen(false); load();
+    toast.success('Student added. Grade records have been initialized for their classes.'); 
+    setStudentId(''); setAddStudentOpen(false); load();
   }
 
   async function handleRemoveStudent() {
@@ -87,117 +142,78 @@ export default function SectionDetailPage({ params }: { params: Promise<{ id: st
     toast.success('Student removed.'); setRemoveTarget(null); load();
   }
 
-  async function handleExportPdf() {
-    if (!section || students.length === 0) return;
-    setExporting(true);
-    try {
-      const { default: jsPDF } = await import('jspdf');
-      const { default: autoTable } = await import('jspdf-autotable');
-      const doc = new jsPDF();
-
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.text('AcadTrack — Grade Report', 14, 18);
-
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100);
-      doc.text(`Section  : ${section.section_name}`, 14, 28);
-      doc.text(`Subject  : ${section.subject_code} — ${section.subject_title}`, 14, 34);
-      doc.text(`Instructor: ${section.instructor_last_name ? section.instructor_last_name + ', ' + section.instructor_first_name : '—'}`, 14, 40);
-      doc.text(`Semester : ${section.term} ${section.school_year}`, 14, 46);
-      doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 52);
-      doc.setTextColor(0);
-
-      autoTable(doc, {
-        startY: 60,
-        head: [['Student ID', 'Last Name', 'First Name', 'Prelim', 'Midterm', 'Final', 'Average', 'Remarks']],
-        body: students.map(s => [
-          s.user_id,
-          s.last_name,
-          s.first_name,
-          s.prelim_grade  ?? '—',
-          s.midterm_grade ?? '—',
-          s.final_grade   ?? '—',
-          s.average       ?? '—',
-          s.remarks       ?? 'Incomplete',
-        ]),
-        headStyles: { fillColor: [37, 99, 235], fontStyle: 'bold', fontSize: 9 },
-        bodyStyles: { fontSize: 9 },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        columnStyles: {
-          0: { cellWidth: 22 },
-          1: { cellWidth: 28 },
-          2: { cellWidth: 28 },
-          3: { cellWidth: 18, halign: 'center' },
-          4: { cellWidth: 18, halign: 'center' },
-          5: { cellWidth: 18, halign: 'center' },
-          6: { cellWidth: 18, halign: 'center' },
-          7: { cellWidth: 24, halign: 'center' },
-        },
-        margin: { left: 14, right: 14 },
-      });
-
-      const pageCount = (doc as any).internal.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(150);
-        doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.getWidth() - 28, doc.internal.pageSize.getHeight() - 10);
-      }
-
-      doc.save(`grade-report-${section.section_name}-${new Date().toISOString().slice(0, 10)}.pdf`);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setExporting(false);
-    }
-  }
-
   if (loading) return <LoadingSpinner />;
   if (!section) return <p className="text-muted-foreground">Section not found.</p>;
 
   return (
     <div>
       <div className="mb-4">
-        <Link href="/sections"><Button variant="ghost" size="sm" className="gap-1"><ArrowLeft className="h-4 w-4" />Back</Button></Link>
+        <Link href="/semesters"><Button variant="ghost" size="sm" className="gap-1"><ArrowLeft className="h-4 w-4" />Back</Button></Link>
       </div>
       <PageHeader
         title={section.section_name}
-        description={`${section.subject_code} — ${section.subject_title} · ${section.term} ${section.school_year}`}
+        description={`Cohort · ${section.term} ${section.school_year} — Capacity: ${section.capacity}`}
       />
 
-      <Tabs defaultValue="schedules">
+      <Tabs defaultValue="classes">
         <TabsList className="mb-4">
-          <TabsTrigger value="schedules">Schedules</TabsTrigger>
+          <TabsTrigger value="classes">Classes ({offerings.length})</TabsTrigger>
           <TabsTrigger value="students">Students ({students.length})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="schedules">
+        <TabsContent value="classes">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between py-3">
-              <CardTitle className="text-sm">Class Schedules</CardTitle>
-              <Button size="sm" onClick={() => setSchedOpen(true)}><Plus className="mr-1 h-3 w-3" />Add</Button>
+              <CardTitle className="text-sm">Subject Offerings</CardTitle>
+              <Button size="sm" onClick={() => setAddOfferingOpen(true)}><Plus className="mr-1 h-3 w-3" />Add Class</Button>
             </CardHeader>
             <CardContent>
-              {schedules.length === 0 ? <EmptyState title="No schedules yet" /> : (
+              {offerings.length === 0 ? <EmptyState title="No classes assigned" description="Add subjects to this section." /> : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Day</TableHead>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Room</TableHead>
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Instructor</TableHead>
+                      <TableHead>Schedule</TableHead>
+                      <TableHead>Units</TableHead>
                       <TableHead className="w-12" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {schedules.map(s => (
-                      <TableRow key={s.schedule_id}>
-                        <TableCell>{s.day_of_week}</TableCell>
-                        <TableCell>{s.start_time.slice(0,5)} – {s.end_time.slice(0,5)}</TableCell>
-                        <TableCell>{s.room}</TableCell>
+                    {offerings.map(o => (
+                      <TableRow key={o.offering_id}>
+                        <TableCell className="font-mono text-sm">{o.subject_code}</TableCell>
+                        <TableCell className="font-medium text-sm">{o.subject_title}</TableCell>
+                        <TableCell className="text-sm">
+                          {o.instructor_first ? `${o.instructor_last}, ${o.instructor_first}` : <span className="text-muted-foreground">Unassigned</span>}
+                        </TableCell>
                         <TableCell>
-                          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDeleteSchedule(s.schedule_id)}>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-tight">
+                              {o.schedule_details ? (() => {
+                                const groups: Record<string, string[]> = {};
+                                o.schedule_details.split(', ').forEach((curr: string) => {
+                                  const [day, time] = curr.split(' ');
+                                  if (!groups[time]) groups[time] = [];
+                                  groups[time].push(day.slice(0, 3).toUpperCase());
+                                });
+                                return Object.entries(groups).map(([time, days]) => `${days.join('/')} ${time}`).join(' | ');
+                              })() : (
+                                <span className="text-slate-400 italic font-normal">No schedule set</span>
+                              )}
+                            </span>
+                            {o.start_date && (
+                              <span className="text-[9px] text-muted-foreground font-medium flex items-center gap-1">
+                                <span className="h-1 w-1 rounded-full bg-slate-300" />
+                                {new Date(o.start_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - {new Date(o.end_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm">{o.credit_units}</TableCell>
+                        <TableCell>
+                          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => toast.error('Implementation required.')}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </TableCell>
@@ -215,10 +231,6 @@ export default function SectionDetailPage({ params }: { params: Promise<{ id: st
             <CardHeader className="flex flex-row items-center justify-between py-3">
               <CardTitle className="text-sm">Enrolled Students</CardTitle>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={handleExportPdf} disabled={exporting || students.length === 0}>
-                  {exporting ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FileDown className="mr-1 h-3 w-3" />}
-                  Export PDF
-                </Button>
                 <Button size="sm" onClick={() => setAddStudentOpen(true)}><Plus className="mr-1 h-3 w-3" />Add Student</Button>
               </div>
             </CardHeader>
@@ -230,15 +242,19 @@ export default function SectionDetailPage({ params }: { params: Promise<{ id: st
                       <TableHead>Student ID</TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead className="w-12" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {students.map(s => (
-                      <TableRow key={s.user_id}>
+                      <TableRow key={s.enrollment_id}>
                         <TableCell className="font-mono text-sm">{s.user_id}</TableCell>
                         <TableCell className="font-medium">{s.last_name}, {s.first_name}</TableCell>
                         <TableCell>{s.email}</TableCell>
+                        <TableCell>
+                          <Badge variant={s.status === 'Enrolled' ? 'default' : 'secondary'}>{s.status}</Badge>
+                        </TableCell>
                         <TableCell>
                           <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setRemoveTarget(s)}>
                             <Trash2 className="h-4 w-4" />
@@ -254,26 +270,96 @@ export default function SectionDetailPage({ params }: { params: Promise<{ id: st
         </TabsContent>
       </Tabs>
 
-      <Dialog open={schedOpen} onOpenChange={setSchedOpen}>
+      <Dialog open={addOfferingOpen} onOpenChange={setAddOfferingOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add Schedule</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Add Subject Offering to Section</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label>Day</Label>
-              <Select value={schedForm.day_of_week} onValueChange={v => setSchedForm(f => ({ ...f, day_of_week: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{DAYS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+              <Label>Subject</Label>
+              <Select value={offeringForm.subject_id} onValueChange={v => setOfferingForm(f => ({ ...f, subject_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
+                <SelectContent>
+                  {subjects.map((sub: any) => (
+                    <SelectItem key={sub.subject_id} value={String(sub.subject_id)}>
+                      {sub.code} — {sub.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>Start Time</Label><Input type="time" value={schedForm.start_time} onChange={e => setSchedForm(f => ({ ...f, start_time: e.target.value }))} /></div>
-              <div className="space-y-1.5"><Label>End Time</Label><Input type="time" value={schedForm.end_time} onChange={e => setSchedForm(f => ({ ...f, end_time: e.target.value }))} /></div>
+            <div className="space-y-1.5">
+              <Label>Instructor <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <Select value={offeringForm.instructor_id} onValueChange={v => setOfferingForm(f => ({ ...f, instructor_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select instructor" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Unassigned</SelectItem>
+                  {faculties.map((fac: any) => (
+                    <SelectItem key={fac.user_id} value={fac.user_id}>
+                      {fac.last_name}, {fac.first_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="space-y-1.5"><Label>Room</Label><Input placeholder="Room 101" value={schedForm.room} onChange={e => setSchedForm(f => ({ ...f, room: e.target.value }))} /></div>
+            
+            <div className="space-y-3 pt-3 border-t">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Class Schedule</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5 col-span-2">
+                  <Label className="text-xs font-medium text-slate-600">Day Options</Label>
+                  <Select value={offeringForm.day_of_week} onValueChange={v => setOfferingForm(f => ({ ...f, day_of_week: v }))}>
+                    <SelectTrigger className="h-8 text-xs font-semibold"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <div className="px-2 py-1.5 text-[10px] font-black uppercase tracking-widest text-indigo-500/70">Regular</div>
+                      <SelectItem value="Monday & Thursday" className="text-xs cursor-pointer">Monday & Thursday</SelectItem>
+                      <SelectItem value="Tuesday & Friday" className="text-xs cursor-pointer">Tuesday & Friday</SelectItem>
+                      <div className="px-2 py-1.5 mt-2 text-[10px] font-black uppercase tracking-widest text-amber-500/70">Special</div>
+                      <SelectItem value="Wednesday" className="text-xs cursor-pointer">Wednesday (Midweek)</SelectItem>
+                      <SelectItem value="Saturday" className="text-xs cursor-pointer">Saturday (Weekend)</SelectItem>
+                      <div className="px-2 py-1.5 mt-2 text-[10px] font-black uppercase tracking-widest text-slate-500/70">Single Day</div>
+                      {['Monday','Tuesday','Thursday','Friday','Sunday'].map(d => (
+                        <SelectItem key={d} value={d} className="text-xs">{d}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-600">Room</Label>
+                  <Input 
+                    placeholder="e.g., CL1" 
+                    className="h-8 text-xs" 
+                    value={offeringForm.room}
+                    onChange={e => setOfferingForm(f => ({ ...f, room: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-600">Time In</Label>
+                  <Input 
+                    type="time" 
+                    className="h-8 text-xs" 
+                    value={offeringForm.start_time}
+                    onChange={e => setOfferingForm(f => ({ ...f, start_time: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-600">Time Out</Label>
+                  <Input 
+                    type="time" 
+                    className="h-8 text-xs" 
+                    value={offeringForm.end_time}
+                    onChange={e => setOfferingForm(f => ({ ...f, end_time: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-muted-foreground mt-2 italic">
+              Students in this section will automatically see this in their Portal.
+            </p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSchedOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddSchedule} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add</Button>
+            <Button variant="outline" onClick={() => setAddOfferingOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddOffering} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add Class</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -284,17 +370,20 @@ export default function SectionDetailPage({ params }: { params: Promise<{ id: st
           <div className="space-y-1.5">
             <Label>Student ID</Label>
             <Input placeholder="2026-0001" value={studentId} onChange={e => setStudentId(e.target.value)} />
+            <p className="text-xs text-muted-foreground mt-2">
+              This will automatically enroll the student and create grade records for all {offerings.length} subject offerings in this section.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddStudentOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddStudent} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add</Button>
+            <Button onClick={handleAddStudent} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add Student</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <ConfirmDialog
         open={!!removeTarget} onOpenChange={o => !o && setRemoveTarget(null)}
-        title="Remove Student?" description={`Remove ${removeTarget?.first_name} ${removeTarget?.last_name} from this section?`}
+        title="Remove Student?" description={`Remove ${removeTarget?.first_name} ${removeTarget?.last_name} from this section? This will delete all of their grades for classes in this section.`}
         onConfirm={handleRemoveStudent} loading={removing} confirmLabel="Remove"
       />
     </div>

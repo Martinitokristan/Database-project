@@ -11,7 +11,11 @@ export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   const { id } = await ctx.params;
 
   const schedules = await query<any[]>(
-    `SELECT * FROM schedules WHERE section_id = ? ORDER BY FIELD(day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'), start_time`,
+    `SELECT sch.* 
+     FROM schedules sch
+     JOIN subject_offerings so ON sch.offering_id = so.offering_id
+     WHERE so.section_id = ? 
+     ORDER BY FIELD(sch.day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'), sch.start_time`,
     [id]
   );
 

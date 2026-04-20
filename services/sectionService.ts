@@ -10,6 +10,7 @@ export const sectionService = {
   update:        (id: number, data: any) => fetchApi(`/api/sections/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   remove:        (id: number) => fetchApi(`/api/sections/${id}`, { method: 'DELETE' }),
   getSchedules:  (id: number) => fetchApi(`/api/sections/${id}/schedules`),
+  getEnrollments:(id: number) => fetchApi(`/api/sections/${id}/enrollments`),
   addStudent:    (id: number, data: { user_id: string }) =>
     fetchApi(`/api/sections/${id}/add-student`, { method: 'POST', body: JSON.stringify(data) }),
   removeStudent: (id: number, userId: string) =>

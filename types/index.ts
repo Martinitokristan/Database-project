@@ -21,34 +21,43 @@ export interface User {
 
 export interface Profile {
   profile_id:    number;
-  user_id?:      string;
-  applicant_id?: number;
+  user_id?:      string | null;
   first_name:    string;
-  middle_name?:  string;
+  middle_name?:  string | null;
   last_name:     string;
-  suffix?:       string;
+  suffix?:       string | null;
   address:       string;
   phone:         string;
   gender:        'Male' | 'Female' | 'Other';
   date_of_birth: string;
   avatar_url?:   string | null;
+  // Applicant specific fields
+  personal_email?: string | null;
+  course_id?:    number | null;
+  applicant_status?: 'Pending' | 'Enrolled' | 'Rejected' | null;
+  applied_at?:   string | null;
+  // Student specific fields
+  year_level?:   string | null;
+  academic_status?: string | null;
 }
 
-export interface Applicant {
-  applicant_id: number;
-  email:        string;
-  course_id:    number;
-  course?:      Course;
-  status:       'Pending' | 'Enrolled' | 'Rejected';
-  applied_at:   string;
-  profile?:     Profile;
+export interface Applicant extends Profile {
+  // Aliases for API compatibility
+  applicant_id: number; // Matches profile_id
+  email: string;        // Matches personal_email
+  status: 'Pending' | 'Enrolled' | 'Rejected'; // Matches applicant_status
+  course_name?: string;
+  subjects_summary?: string;
 }
 
 export interface Department {
   dept_id:             number;
   department_name:     string;
-  department_head_id?: string;
-  head?:               User;
+  department_head_id?: string | null;
+  head?:               User | null;
+  // Joined fields
+  first_name?: string | null;
+  last_name?:  string | null;
 }
 
 export interface Course {
@@ -65,6 +74,9 @@ export interface Subject {
   title:        string;
   credit_units: number;
   course?:      Course;
+  // Joined fields
+  dept_id?:     number;
+  course_name?: string;
 }
 
 export interface Semester {
@@ -87,6 +99,12 @@ export interface Section {
   instructor?:     User;
   semester?:       Semester;
   enrolled_count?: number;
+  // Joined fields
+  subject_code?:   string;
+  subject_title?:  string;
+  term?:           string;
+  school_year?:    string;
+  semester_status?: 'Active' | 'Inactive';
 }
 
 export interface Schedule {

@@ -13,7 +13,9 @@ import { cn } from '@/lib/utils';
 import {
   ChevronLeft, ChevronRight, Clock, AlertCircle,
   CheckCircle2, Circle, SkipForward, Send, Loader2,
+  ShieldAlert, Save, FileCheck, RefreshCw,
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 type QStatus = 'answered' | 'skipped' | 'untouched';
 
@@ -46,17 +48,20 @@ export default function TakeAssessmentPage({ params }: { params: Promise<{ id: s
 
 function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string }) {
   const router = useRouter();
-  const [phase, setPhase]           = useState<'loading' | 'start' | 'taking' | 'review' | 'submitted'>('loading');
+  const [phase, setPhase] = useState<'loading' | 'start' | 'taking' | 'review' | 'submitted'>('loading');
   const [assessment, setAssessment] = useState<any>(null);
-  const [attempt, setAttempt]       = useState<any>(null);
-  const [questions, setQuestions]   = useState<any[]>([]);
+  const [attempt, setAttempt] = useState<any>(null);
+  const [questions, setQuestions] = useState<any[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [responses, setResponses]   = useState<Record<number, any>>({});
-  const [timeLeft, setTimeLeft]     = useState<number | null>(null);
+  const [responses, setResponses] = useState<Record<number, any>>({});
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [startTime]                 = useState(Date.now());
-  const timerRef                    = useRef<NodeJS.Timeout | null>(null);
-  const autoSaveRef                 = useRef<NodeJS.Timeout | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [violations, setViolations] = useState(0);
+  const [showViolation, setShowViolation] = useState(false);
+  const [startTime] = useState(Date.now());
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoSaveRef = useRef<NodeJS.Timeout | null>(null);
 
   const load = useCallback(async () => {
     const res = await assessmentService.getAttempt(assessmentId);
@@ -77,7 +82,7 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
       setResponses(respMap);
 
       if (att.time_spent !== null && att.started_at) {
-        const elapsed  = Math.floor((Date.now() - new Date(att.started_at).getTime()) / 1000);
+        const elapsed = Math.floor((Date.now() - new Date(att.started_at).getTime()) / 1000);
         const totalSec = (att.timer_minutes || 0) * 60;
         if (totalSec > 0) setTimeLeft(Math.max(0, totalSec - elapsed));
       }
@@ -85,7 +90,7 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
     } else {
       const listRes = await assessmentService.list();
       const asmList = listRes.success ? listRes.data ?? [] : [];
-      const found   = asmList.find((a: any) => a.assessment_id === assessmentId);
+      const found = asmList.find((a: any) => a.assessment_id === assessmentId);
       setAssessment(found ?? { assessment_id: assessmentId });
       setPhase('start');
     }
@@ -97,7 +102,7 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
     if (phase !== 'taking' || !attempt) return;
     const timerMins = attempt.timer_minutes ?? assessment?.timer_minutes;
     if (!timerMins) return;
-    const elapsed  = Math.floor((Date.now() - new Date(attempt.started_at).getTime()) / 1000);
+    const elapsed = Math.floor((Date.now() - new Date(attempt.started_at).getTime()) / 1000);
     const totalSec = timerMins * 60;
     setTimeLeft(Math.max(0, totalSec - elapsed));
   }, [phase, attempt, assessment]);
@@ -108,6 +113,45 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
     timerRef.current = setTimeout(() => setTimeLeft(t => (t !== null ? t - 1 : null)), 1000);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [timeLeft]);
+
+  /* ── Cheating Prevention Logic ── */
+  useEffect(() => {
+    if (phase !== 'taking') return;
+
+    const handleViolation = () => {
+      setViolations(v => {
+        const next = v + 1;
+        if (next >= 3) {
+          toast.error('Multiple security violations detected. Auto-submitting assessment.', { duration: 5000 });
+          handleSubmit(true);
+        } else {
+          setShowViolation(true);
+        }
+        return next;
+      });
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') handleViolation();
+    };
+
+    const onBlur = () => handleViolation();
+
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      return (e.returnValue = 'Are you sure you want to leave? Your progress may not be fully saved.');
+    };
+
+    window.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('beforeunload', onBeforeUnload);
+
+    return () => {
+      window.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
+  }, [phase]);
 
   async function handleStart() {
     const res = await assessmentService.startAttempt(assessmentId);
@@ -125,10 +169,17 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
 
   function saveLocal(qid: number, val: any) {
     setResponses(r => ({ ...r, [qid]: val }));
+    setSaveStatus('saving');
     if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
-    autoSaveRef.current = setTimeout(() => {
+    autoSaveRef.current = setTimeout(async () => {
       if (attempt) {
-        assessmentService.saveResponse(assessmentId, { attempt_id: attempt.attempt_id, question_id: qid, ...val });
+        try {
+          const res = await assessmentService.saveResponse(assessmentId, { attempt_id: attempt.attempt_id, question_id: qid, ...val });
+          if (res.success) setSaveStatus('saved');
+          else setSaveStatus('error');
+        } catch {
+          setSaveStatus('error');
+        }
       }
     }, 800);
   }
@@ -161,9 +212,9 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
     return 'skipped';
   }
 
-  const answeredCount  = questions.filter(q => getStatus(q.question_id) === 'answered').length;
-  const skippedCount   = questions.filter(q => getStatus(q.question_id) === 'skipped').length;
-  const currentQ       = questions[currentIdx];
+  const answeredCount = questions.filter(q => getStatus(q.question_id) === 'answered').length;
+  const skippedCount = questions.filter(q => getStatus(q.question_id) === 'skipped').length;
+  const currentQ = questions[currentIdx];
 
   /* ── Start Screen ── */
   if (phase === 'start') {
@@ -294,13 +345,13 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
 
   /* ── Taking Screen ── */
   if (phase === 'taking' && currentQ) {
-    const q           = currentQ;
-    const resp        = responses[q.question_id] ?? {};
-    const qStatus     = getStatus(q.question_id);
+    const q = currentQ;
+    const resp = responses[q.question_id] ?? {};
+    const qStatus = getStatus(q.question_id);
     const shuffledOpts = q.options && q.options.length
       ? seededShuffle(q.options, (attempt?.attempt_id ?? 1) * q.question_id)
       : [];
-    const matchOpts    = q.options ?? [];
+    const matchOpts = q.options ?? [];
 
     return (
       <div className="max-w-3xl mx-auto space-y-4">
@@ -310,11 +361,18 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
             Question {currentIdx + 1} of {questions.length}
           </p>
           <div className="flex items-center gap-3">
+            {/* Save indicator */}
+            <div className="hidden sm:flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground mr-2">
+              {saveStatus === 'saving' && <><RefreshCw className="h-3 w-3 animate-spin" /> Saving...</>}
+              {saveStatus === 'saved' && <><FileCheck className="h-3 w-3 text-emerald-500" /> Draft Saved</>}
+              {saveStatus === 'error' && <><AlertCircle className="h-3 w-3 text-rose-500" /> Save Failed</>}
+            </div>
+
             {timeLeft !== null && (
               <div className={cn('flex items-center gap-1.5 font-mono text-sm font-semibold px-3 py-1 rounded-full',
                 timeLeft <= 60 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 animate-pulse'
-                : timeLeft <= 300 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                : 'bg-muted text-muted-foreground'
+                  : timeLeft <= 300 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                    : 'bg-muted text-muted-foreground'
               )}>
                 <Clock className="h-3.5 w-3.5" />
                 {String(Math.floor(timeLeft / 60)).padStart(2, '0')}:{String(timeLeft % 60).padStart(2, '0')}
@@ -326,6 +384,29 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
           </div>
         </div>
 
+        {/* Violation Dialog */}
+        <Dialog open={showViolation} onOpenChange={setShowViolation}>
+          <DialogContent aria-describedby={undefined} className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-rose-600">
+                <ShieldAlert className="h-5 w-5" /> Security Warning
+              </DialogTitle>
+              <DialogDescription className="pt-2">
+                It was detected that you left the assessment window. This is considered a security violation.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="bg-rose-50 dark:bg-rose-900/20 p-4 rounded-lg flex flex-col items-center gap-2 text-center border border-rose-100 dark:border-rose-900/30">
+              <p className="text-xl font-black text-rose-800 dark:text-rose-300">Warning {violations} / 3</p>
+              <p className="text-xs font-medium text-rose-700 dark:text-rose-400">If you reach 3 warnings, your assessment will be automatically submitted.</p>
+            </div>
+            <DialogFooter>
+              <Button className="w-full bg-rose-600 hover:bg-rose-700 text-white" onClick={() => setShowViolation(false)}>
+                I understand, back to test
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Question navigator */}
         <div className="flex gap-1 overflow-x-auto pb-1">
           {questions.map((q2, i) => {
@@ -335,10 +416,10 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
                 key={q2.question_id}
                 onClick={() => setCurrentIdx(i)}
                 className={cn('h-7 min-w-[28px] px-1 rounded text-xs font-medium transition-colors shrink-0', {
-                  'bg-primary text-primary-foreground':                                   i === currentIdx,
-                  'bg-green-500 text-white':                                              i !== currentIdx && st === 'answered',
+                  'bg-primary text-primary-foreground': i === currentIdx,
+                  'bg-green-500 text-white': i !== currentIdx && st === 'answered',
                   'bg-yellow-300 text-yellow-900 dark:bg-yellow-700 dark:text-yellow-100': i !== currentIdx && st === 'skipped',
-                  'bg-muted text-muted-foreground':                                       i !== currentIdx && st === 'untouched',
+                  'bg-muted text-muted-foreground': i !== currentIdx && st === 'untouched',
                 })}
               >
                 {i + 1}
@@ -356,7 +437,7 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
                   <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium">
                     {q.question_type === 'MultipleChoice' ? 'Multiple Choice'
                       : q.question_type === 'Identification' ? 'Identification'
-                      : 'Matching Type'}
+                        : 'Matching Type'}
                   </span>
                   <span className="text-xs text-muted-foreground">{q.points} pt{q.points !== 1 ? 's' : ''}</span>
                 </div>

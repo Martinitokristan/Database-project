@@ -25,13 +25,15 @@ export const GET = apiHandler(async (req: NextRequest) => {
             p.first_name, p.last_name, p.middle_name,
             u.email,
             sec.section_name,
-            sub.code AS subject_code, sub.title AS subject_title,
-            sem.school_year, sem.term
+            sem.school_year, sem.term,
+            (SELECT GROUP_CONCAT(sub2.code SEPARATOR ', ') 
+             FROM subject_offerings so2 
+             JOIN subjects sub2 ON so2.subject_id = sub2.subject_id 
+             WHERE so2.section_id = sec.section_id) AS subjects_summary
      FROM enrollments e
      JOIN users u ON e.user_id = u.user_id
      LEFT JOIN profiles p ON p.user_id = u.user_id
      JOIN sections sec ON e.section_id = sec.section_id
-     JOIN subjects sub ON sec.subject_id = sub.subject_id
      JOIN semesters sem ON sec.semester_id = sem.semester_id
      ${where}
      ORDER BY e.created_at DESC

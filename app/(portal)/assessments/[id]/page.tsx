@@ -27,9 +27,9 @@ import {
 type Tab = 'questions' | 'settings' | 'access' | 'results';
 
 const statusColors: Record<string, string> = {
-  Draft:     'bg-muted text-muted-foreground',
+  Draft: 'bg-muted text-muted-foreground',
   Published: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  Closed:    'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  Closed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
 };
 
 export default function AssessmentDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -49,9 +49,9 @@ function StudentRedirect({ id }: { id: string }) {
 /* ─── Faculty Management ────────────────────────────────────────── */
 function FacultyManagement({ id }: { id: string }) {
   const router = useRouter();
-  const [tab, setTab]             = useState<Tab>('questions');
+  const [tab, setTab] = useState<Tab>('questions');
   const [assessment, setAssessment] = useState<any>(null);
-  const [loading, setLoading]     = useState(true);
+  const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
 
   const load = useCallback(async () => {
@@ -88,9 +88,9 @@ function FacultyManagement({ id }: { id: string }) {
   if (loading) return <LoadingSpinner />;
   if (!assessment) return null;
 
-  const isDraft     = assessment.status === 'Draft';
+  const isDraft = assessment.status === 'Draft';
   const isPublished = assessment.status === 'Published';
-  const isClosed    = assessment.status === 'Closed';
+  const isClosed = assessment.status === 'Closed';
 
   return (
     <div>
@@ -132,10 +132,10 @@ function FacultyManagement({ id }: { id: string }) {
       {/* Tabs */}
       <div className="flex gap-1 border-b mb-6">
         {([
-          { key: 'questions', label: 'Questions',  icon: ClipboardList },
-          { key: 'settings',  label: 'Settings',   icon: Settings },
-          { key: 'access',    label: 'Access',      icon: Users },
-          { key: 'results',   label: 'Results',     icon: BarChart3 },
+          { key: 'questions', label: 'Questions', icon: ClipboardList },
+          { key: 'settings', label: 'Settings', icon: Settings },
+          { key: 'access', label: 'Access', icon: Users },
+          { key: 'results', label: 'Results', icon: BarChart3 },
         ] as { key: Tab; label: string; icon: any }[]).map(t => (
           <button
             key={t.key}
@@ -154,17 +154,17 @@ function FacultyManagement({ id }: { id: string }) {
       </div>
 
       {tab === 'questions' && <QuestionsTab assessment={assessment} onRefresh={load} />}
-      {tab === 'settings'  && <SettingsTab  assessment={assessment} onRefresh={load} key={`settings-${assessment.updated_at || Date.now()}`} />}
-      {tab === 'access'    && <AccessTab    assessmentId={Number(id)} />}
-      {tab === 'results'   && <ResultsTab   assessmentId={Number(id)} assessment={assessment} />}
+      {tab === 'settings' && <SettingsTab assessment={assessment} onRefresh={load} key={`settings-${assessment.updated_at || Date.now()}`} />}
+      {tab === 'access' && <AccessTab assessmentId={Number(id)} />}
+      {tab === 'results' && <ResultsTab assessmentId={Number(id)} assessment={assessment} />}
     </div>
   );
 }
 
 /* ─── Questions Tab ─────────────────────────────────────────────── */
 function QuestionsTab({ assessment, onRefresh }: { assessment: any; onRefresh: () => void }) {
-  const [showAdd, setShowAdd]   = useState(false);
-  const [editQ, setEditQ]       = useState<any>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editQ, setEditQ] = useState<any>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const questions: any[] = assessment.questions ?? [];
 
@@ -296,12 +296,12 @@ function QuestionDialog({ assessmentId, editData, onClose, onSaved }: {
 }) {
   const isEdit = !!editData;
   const [saving, setSaving] = useState(false);
-  const [qType, setQType]   = useState<string>(editData?.question_type ?? 'MultipleChoice');
-  const [text, setText]     = useState(editData?.question_text ?? '');
+  const [qType, setQType] = useState<string>(editData?.question_type ?? 'MultipleChoice');
+  const [text, setText] = useState(editData?.question_text ?? '');
   const [points, setPoints] = useState<string>(String(editData?.points ?? '1'));
   const [caseSensitive, setCaseSensitive] = useState(editData?.case_sensitive ?? false);
 
-  const [options, setOptions]   = useState<{ option_text: string; is_correct: boolean; match_text?: string }[]>(
+  const [options, setOptions] = useState<{ option_text: string; is_correct: boolean; match_text?: string }[]>(
     editData?.options?.length ? editData.options.map((o: any) => ({ option_text: o.option_text, is_correct: !!o.is_correct, match_text: o.match_text || '' }))
       : qType === 'MultipleChoice' ? [
         { option_text: '', is_correct: true },
@@ -309,11 +309,11 @@ function QuestionDialog({ assessmentId, editData, onClose, onSaved }: {
         { option_text: '', is_correct: false },
         { option_text: '', is_correct: false },
       ]
-      : qType === 'Matching' ? [
-        { option_text: '', is_correct: false, match_text: '' },
-        { option_text: '', is_correct: false, match_text: '' },
-      ]
-      : []
+        : qType === 'Matching' ? [
+          { option_text: '', is_correct: false, match_text: '' },
+          { option_text: '', is_correct: false, match_text: '' },
+        ]
+          : []
   );
   const [answers, setAnswers] = useState<string[]>(
     editData?.answers?.length ? editData.answers.map((a: any) => a.answer_text) : ['', '', '']
@@ -359,7 +359,7 @@ function QuestionDialog({ assessmentId, editData, onClose, onSaved }: {
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+      <DialogContent aria-describedby={undefined} className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit' : 'Add'} Question</DialogTitle>
         </DialogHeader>
@@ -502,10 +502,10 @@ function QuestionDialog({ assessmentId, editData, onClose, onSaved }: {
 function UploadDialog({ assessmentId, onClose, onSaved }: {
   assessmentId: number; onClose: () => void; onSaved: () => void;
 }) {
-  const [file, setFile]       = useState<File | null>(null);
-  const [parsed, setParsed]   = useState<any[]>([]);
-  const [errors, setErrors]   = useState<string[]>([]);
-  const [saving, setSaving]   = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [parsed, setParsed] = useState<any[]>([]);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
   const [parsing, setParsing] = useState(false);
 
   async function handleParse() {
@@ -533,7 +533,7 @@ function UploadDialog({ assessmentId, onClose, onSaved }: {
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+      <DialogContent aria-describedby={undefined} className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Upload Questions</DialogTitle>
         </DialogHeader>
@@ -542,7 +542,7 @@ function UploadDialog({ assessmentId, onClose, onSaved }: {
             <p className="font-medium mb-1">Supported File Formats</p>
             <p className="text-xs"><strong>CSV</strong> — Structured data with type, question, points, options</p>
             <p className="text-xs"><strong>PDF, DOCX, DOC, TXT</strong> — Auto-parsed structured text</p>
-            
+
             <div className="mt-3 p-2 bg-muted rounded text-left text-xs">
               <p className="font-medium mb-1">CSV Format:</p>
               <code className="text-xs block">type,question,points,col4,col5,col6,col7,col8</code>
@@ -562,10 +562,10 @@ function UploadDialog({ assessmentId, onClose, onSaved }: {
             </div>
           </div>
           <div className="space-y-2">
-            <Input 
-              type="file" 
-              accept=".csv,.pdf,.doc,.docx,.txt" 
-              onChange={e => { setFile(e.target.files?.[0] ?? null); setParsed([]); setErrors([]); }} 
+            <Input
+              type="file"
+              accept=".csv,.pdf,.doc,.docx,.txt"
+              onChange={e => { setFile(e.target.files?.[0] ?? null); setParsed([]); setErrors([]); }}
             />
             <Button size="sm" variant="outline" onClick={handleParse} disabled={!file || parsing}>
               {parsing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -631,20 +631,20 @@ function SettingsTab({ assessment, onRefresh }: { assessment: any; onRefresh: ()
 
   // Helper to build form state from assessment
   const buildFormState = (a: any) => ({
-    title:              a.title,
-    description:        a.description ?? '',
-    assessment_type:    a.assessment_type,
-    timer_minutes:      a.timer_minutes ?? '',
+    title: a.title,
+    description: a.description ?? '',
+    assessment_type: a.assessment_type,
+    timer_minutes: a.timer_minutes ?? '',
     per_question_timer: a.per_question_timer ?? '',
-    shuffle_questions:  !!a.shuffle_questions,
-    shuffle_choices:    !!a.shuffle_choices,
-    allow_retakes:      !!a.allow_retakes,
-    max_attempts:       a.max_attempts ?? 1,
+    shuffle_questions: !!a.shuffle_questions,
+    shuffle_choices: !!a.shuffle_choices,
+    allow_retakes: !!a.allow_retakes,
+    max_attempts: a.max_attempts ?? 1,
     assessment_password: '',
-    open_at:            formatForInput(a.open_at),
-    close_at:           formatForInput(a.close_at),
-    is_open:            !!a.is_open,
-    show_results:       !!a.show_results,
+    open_at: formatForInput(a.open_at),
+    close_at: formatForInput(a.close_at),
+    is_open: !!a.is_open,
+    show_results: !!a.show_results,
   });
 
   const [form, setForm] = useState(() => buildFormState(assessment));
@@ -675,11 +675,11 @@ function SettingsTab({ assessment, onRefresh }: { assessment: any; onRefresh: ()
 
       const payload = {
         ...form,
-        timer_minutes:      form.timer_minutes ? Number(form.timer_minutes) : null,
+        timer_minutes: form.timer_minutes ? Number(form.timer_minutes) : null,
         per_question_timer: form.per_question_timer ? Number(form.per_question_timer) : null,
-        max_attempts:       Number(form.max_attempts) || 1,
-        open_at:            formatDateTime(form.open_at),
-        close_at:           formatDateTime(form.close_at),
+        max_attempts: Number(form.max_attempts) || 1,
+        open_at: formatDateTime(form.open_at),
+        close_at: formatDateTime(form.close_at),
         assessment_password: form.assessment_password || null,
       };
 
@@ -744,7 +744,7 @@ function SettingsTab({ assessment, onRefresh }: { assessment: any; onRefresh: ()
                     onClick={() => set('timer_minutes', mins)}
                     className="text-xs px-2 py-1 bg-muted hover:bg-muted/80 rounded"
                   >
-                    {mins >= 60 ? `${Math.floor(mins/60)}hr${mins % 60 ? ' 30m' : ''}` : `${mins}m`}
+                    {mins >= 60 ? `${Math.floor(mins / 60)}hr${mins % 60 ? ' 30m' : ''}` : `${mins}m`}
                   </button>
                 ))}
               </div>
@@ -762,7 +762,7 @@ function SettingsTab({ assessment, onRefresh }: { assessment: any; onRefresh: ()
         <CardContent className="space-y-3">
           {[
             { key: 'shuffle_questions', label: 'Shuffle question order per student' },
-            { key: 'shuffle_choices',   label: 'Shuffle MCQ choices per student' },
+            { key: 'shuffle_choices', label: 'Shuffle MCQ choices per student' },
           ].map(({ key, label }) => (
             <div key={key} className="flex items-center justify-between">
               <Label className="font-normal">{label}</Label>
@@ -799,9 +799,9 @@ function SettingsTab({ assessment, onRefresh }: { assessment: any; onRefresh: ()
             </div>
           </div>
           {[
-            { key: 'allow_retakes',  label: 'Allow retakes up to max attempts' },
-            { key: 'is_open',        label: 'Manually open (override schedule)' },
-            { key: 'show_results',   label: 'Release results to students' },
+            { key: 'allow_retakes', label: 'Allow retakes up to max attempts' },
+            { key: 'is_open', label: 'Manually open (override schedule)' },
+            { key: 'show_results', label: 'Release results to students' },
           ].map(({ key, label }) => (
             <div key={key} className="flex items-center justify-between">
               <Label className="font-normal">{label}</Label>
@@ -824,7 +824,7 @@ function SettingsTab({ assessment, onRefresh }: { assessment: any; onRefresh: ()
 /* ─── Access Tab ─────────────────────────────────────────────────── */
 function AccessTab({ assessmentId }: { assessmentId: number }) {
   const [students, setStudents] = useState<any[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -949,7 +949,7 @@ function ResultsTab({ assessmentId, assessment }: { assessmentId: number; assess
                 <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No submissions yet.</TableCell></TableRow>
               ) : Object.entries(grouped).map(([uid, atts]) => {
                 const best = atts.reduce((b, a) => (a.score ?? 0) > (b.score ?? 0) ? a : b, atts[0]);
-                const pct  = best.max_score ? Math.round((best.score / best.max_score) * 100) : 0;
+                const pct = best.max_score ? Math.round((best.score / best.max_score) * 100) : 0;
                 return (
                   <TableRow key={uid}>
                     <TableCell className="font-medium">{best.last_name}, {best.first_name}</TableCell>

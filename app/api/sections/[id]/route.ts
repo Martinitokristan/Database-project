@@ -4,11 +4,11 @@ import { requireRole, apiHandler, json, getTokenPayload } from '@/lib/middleware
 import { z } from 'zod';
 
 const UpdateSectionSchema = z.object({
-  subject_id:    z.number().int().positive().optional(),
-  instructor_id: z.string().optional(),
-  semester_id:   z.number().int().positive().optional(),
-  section_name:  z.string().min(1).max(100).optional(),
-  capacity:      z.number().int().min(1).optional(),
+  section_name: z.string().min(1).max(100).optional(),
+  year_level:   z.enum(['1st Year','2nd Year','3rd Year','4th Year','Masteral','Doctorate','Irregular']).optional(),
+  capacity:     z.number().int().min(1).optional(),
+  is_archived:  z.boolean().optional(),
+  semester_id:  z.number().int().positive().optional(),
 });
 
 export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
@@ -21,14 +21,9 @@ export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
 
   const sections = await query<any[]>(
     `SELECT sec.*,
-            sub.code AS subject_code, sub.title AS subject_title, sub.credit_units,
-            p.first_name AS instructor_first, p.last_name AS instructor_last,
             sem.school_year, sem.term, sem.status AS semester_status,
-            COUNT(e.enrollment_id) AS enrolled_count
+            COUNT(DISTINCT e.enrollment_id) AS enrolled_count
      FROM sections sec
-     JOIN subjects sub ON sec.subject_id = sub.subject_id
-     JOIN users u ON sec.instructor_id = u.user_id
-     LEFT JOIN profiles p ON p.user_id = u.user_id
      JOIN semesters sem ON sec.semester_id = sem.semester_id
      LEFT JOIN enrollments e ON e.section_id = sec.section_id AND e.status = 'Enrolled'
      WHERE sec.section_id = ?
@@ -38,11 +33,30 @@ export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
 
   if (sections.length === 0) return json({ success: false, message: 'Section not found.' }, 404);
 
-  if (role === 'faculty' && sections[0].instructor_id !== payload.user_id) {
-    throw { status: 403, message: 'Access denied.' };
+  // Faculty access check — must have an offering in this section
+  if (role === 'faculty') {
+    const offering = await query<any[]>(
+      'SELECT offering_id FROM subject_offerings WHERE section_id = ? AND instructor_id = ? LIMIT 1',
+      [id, payload.user_id]
+    );
+    if (offering.length === 0) throw { status: 403, message: 'Access denied.' };
   }
 
-  return json({ success: true, data: sections[0] });
+  // Fetch subject offerings for this section
+  const offerings = await query<any[]>(
+    `SELECT so.offering_id, so.subject_id, so.instructor_id,
+            sub.code AS subject_code, sub.title AS subject_title, sub.credit_units,
+            p.first_name AS instructor_first, p.last_name AS instructor_last
+     FROM subject_offerings so
+     JOIN subjects sub ON so.subject_id = sub.subject_id
+     JOIN users u ON so.instructor_id = u.user_id
+     LEFT JOIN profiles p ON p.user_id = u.user_id
+     WHERE so.section_id = ?
+     ORDER BY sub.title`,
+    [id]
+  );
+
+  return json({ success: true, data: { ...sections[0], offerings } });
 });
 
 export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
@@ -74,9 +88,11 @@ export const DELETE = apiHandler(async (req: NextRequest, ctx: { params: Promise
   if (existing.length === 0) return json({ success: false, message: 'Section not found.' }, 404);
 
   const inUse = await query<any[]>('SELECT enrollment_id FROM enrollments WHERE section_id = ? LIMIT 1', [id]);
-  if (inUse.length > 0) return json({ success: false, message: 'Cannot delete: section has enrollments.' }, 409);
+  if (inUse.length > 0) return json({ success: false, message: 'Cannot delete: section has active enrollments.' }, 409);
 
-  await query('DELETE FROM schedules WHERE section_id = ?', [id]);
+  // Cascade: delete schedules → subject_offerings → section
+  await query('DELETE sch FROM schedules sch JOIN subject_offerings so ON sch.offering_id = so.offering_id WHERE so.section_id = ?', [id]);
+  await query('DELETE FROM subject_offerings WHERE section_id = ?', [id]);
   await query('DELETE FROM sections WHERE section_id = ?', [id]);
   return json({ success: true, message: 'Section deleted.' });
 });
