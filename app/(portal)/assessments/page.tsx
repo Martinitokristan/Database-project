@@ -89,6 +89,13 @@ function FacultyAssessments() {
                           <span className="mx-1">·</span>
                           {a.section_name}
                         </p>
+                        {(a.open_at || a.close_at) && (
+                          <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                            <Clock className="h-3 w-3" />
+                            {a.open_at ? new Date(a.open_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'Now'}{' '}—{' '}
+                            {a.close_at ? new Date(a.close_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'No deadline'}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
@@ -171,6 +178,13 @@ function StudentAssessments() {
                         </div>
                         {a.instructor_name && (
                           <p className="text-xs text-muted-foreground mt-0.5">by {a.instructor_name}</p>
+                        )}
+                        {(a.open_at || a.close_at) && (
+                          <div className="text-xs font-medium text-muted-foreground flex items-center gap-1 mt-1.5 bg-muted/30 px-2 py-1 rounded inline-flex">
+                            <Clock className="h-3.5 w-3.5" />
+                            {a.open_at ? new Date(a.open_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'Now'}{' '}—{' '}
+                            {a.close_at ? new Date(a.close_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'No deadline'}
+                          </div>
                         )}
                       </div>
                     </div>

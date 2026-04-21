@@ -67,9 +67,9 @@ export const POST = apiHandler(async (req: NextRequest, ctx: { params: Promise<{
   const payload = requireRole(req, ['Student']);
 
   const [aRows] = await pool.execute(`
-    SELECT a.*, sec.section_id
+    SELECT a.*, off.section_id
     FROM assessments a
-    JOIN sections sec ON sec.section_id = a.section_id
+    JOIN subject_offerings off ON off.offering_id = a.offering_id
     WHERE a.assessment_id = ? AND a.status = 'Published'
   `, [id]) as any;
   if (!aRows.length) throw { status: 404, message: 'Assessment not available.' };

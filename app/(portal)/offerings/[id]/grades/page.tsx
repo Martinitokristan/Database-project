@@ -53,11 +53,11 @@ export default function GradeManagerPage({ params }: { params: Promise<{ id: str
     setShowFinalize(false);
     load();
   }
-  async function handleSave(enrollmentId: number, gradeId: number) {
+  async function handleSave(enrollmentId: number) {
     const edit = edits[enrollmentId];
     if (!edit) return;
     setSaving(enrollmentId);
-    const res = await gradeService.updateGrade(gradeId, edit);
+    const res = await gradeService.updateGrade(Number(id), enrollmentId, edit);
     setSaving(null);
     if (!res.success) { toast.error(res.message); return; }
     toast.success('Grade saved.');
@@ -156,7 +156,7 @@ export default function GradeManagerPage({ params }: { params: Promise<{ id: str
                         <TableCell>{g.remarks ? <StatusBadge status={g.remarks} /> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
                         <TableCell>
                           {isDirty && (
-                            <Button size="sm" onClick={() => handleSave(g.enrollment_id, g.grade_id)} disabled={saving === g.enrollment_id}>
+                            <Button size="sm" onClick={() => handleSave(g.enrollment_id)} disabled={saving === g.enrollment_id}>
                               {saving === g.enrollment_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                             </Button>
                           )}

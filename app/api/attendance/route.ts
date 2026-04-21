@@ -48,18 +48,28 @@ export const GET = apiHandler(async (req: NextRequest) => {
   );
 
   // 3. Compute Summary
+  const uniqueDates = new Set(records.map(r => {
+    const d = new Date(r.date);
+    return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  }));
+  const totalMeetings = uniqueDates.size;
+
   const summary = enrollments.map(e => {
     const studentRecords = records.filter(r => r.user_id === e.user_id);
     const present = studentRecords.filter(r => r.status === 'Present').length;
     const late    = studentRecords.filter(r => r.status === 'Late').length;
     const absent  = studentRecords.filter(r => r.status === 'Absent').length;
-    const total   = studentRecords.length;
-    // Percent calculation usually based on total school days, but here we can return counts
+    
+    // Calculate percentage based on total meetings in the month so far
+    const percent = totalMeetings > 0 
+      ? Math.round(((present + (late * 0.5)) / totalMeetings) * 100) 
+      : 0;
+
     return {
       user_id: e.user_id,
       full_name: `${e.last_name}, ${e.first_name}`,
       present, late, absent,
-      percent: total > 0 ? Math.round(((present + late) / total) * 100) : 0
+      percent: Math.min(100, Math.max(0, percent))
     };
   });
 

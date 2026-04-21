@@ -16,6 +16,7 @@ import {
   ShieldAlert, Save, FileCheck, RefreshCw,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
 type QStatus = 'answered' | 'skipped' | 'untouched';
 
@@ -59,6 +60,7 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [violations, setViolations] = useState(0);
   const [showViolation, setShowViolation] = useState(false);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [startTime] = useState(Date.now());
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const autoSaveRef = useRef<NodeJS.Timeout | null>(null);
@@ -73,7 +75,7 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
 
       const qList = qs.map((q: any) => ({
         ...q,
-        options: q.options ? (JSON.parse(q.options || '[]').filter(Boolean)) : [],
+        options: Array.isArray(q.options) ? q.options : (q.options ? JSON.parse(q.options).filter(Boolean) : []),
       }));
       setQuestions(qList);
 
@@ -184,9 +186,8 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
     }, 800);
   }
 
-  async function handleSubmit(auto = false) {
+  async function doSubmit() {
     if (!attempt) return;
-    if (!auto && !confirm('Submit your assessment? You cannot change your answers after submitting.')) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     setSubmitting(true);
     const respArr = Object.entries(responses).map(([qid, val]) => ({
@@ -203,6 +204,15 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
     if (!res.success) { toast.error(res.message); return; }
     setAttempt((a: any) => ({ ...a, score: res.data.score, max_score: res.data.max_score }));
     setPhase('submitted');
+  }
+
+  async function handleSubmit(auto = false) {
+    if (!attempt) return;
+    if (auto) {
+      await doSubmit();
+    } else {
+      setShowSubmitConfirm(true);
+    }
   }
 
   function getStatus(qid: number): QStatus {
@@ -299,46 +309,75 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
   /* ── Review Screen ── */
   if (phase === 'review') {
     return (
-      <div className="max-w-2xl mx-auto space-y-4">
-        <h2 className="text-lg font-bold">Review Before Submitting</h2>
-        <div className="grid grid-cols-8 gap-2">
-          {questions.map((q, i) => {
-            const st = getStatus(q.question_id);
-            return (
-              <button
-                key={q.question_id}
-                onClick={() => { setCurrentIdx(i); setPhase('taking'); }}
-                className={cn('h-9 w-9 rounded-lg text-xs font-medium transition-colors', {
-                  'bg-primary text-primary-foreground': st === 'answered',
-                  'bg-yellow-200 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-200': st === 'skipped',
-                  'bg-muted text-muted-foreground': st === 'untouched',
+      <div className="max-w-3xl mx-auto mt-8">
+        <Card className="border-muted shadow-sm">
+          <CardContent className="p-8 space-y-6">
+            <div className="flex items-center gap-4 mb-2">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 shrink-0">
+                <FileCheck className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Review Before Submitting</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">Please review your answers before final submission.</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border bg-card p-6 flex flex-col gap-6">
+              <div className="grid grid-cols-10 gap-3">
+                {questions.map((q, i) => {
+                  const st = getStatus(q.question_id);
+                  return (
+                    <button
+                      key={q.question_id}
+                      onClick={() => { setCurrentIdx(i); setPhase('taking'); }}
+                      className={cn('h-10 w-10 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors hover:opacity-80 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', {
+                        'bg-primary text-primary-foreground shadow-sm': st === 'answered',
+                        'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-400': st === 'skipped',
+                        'bg-muted text-muted-foreground hover:border-border border border-transparent': st === 'untouched',
+                      })}
+                    >
+                      {i + 1}
+                    </button>
+                  );
                 })}
-              >
-                {i + 1}
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex gap-4 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-primary inline-block" />Answered ({answeredCount})</span>
-          <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-yellow-300 inline-block" />Skipped ({skippedCount})</span>
-          <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-muted inline-block" />Untouched ({questions.length - answeredCount - skippedCount})</span>
-        </div>
-        {questions.length - answeredCount > 0 && (
-          <div className="rounded-lg bg-yellow-50 dark:bg-yellow-900/20 p-3 flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-300">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            {questions.length - answeredCount} unanswered question{questions.length - answeredCount !== 1 ? 's' : ''} will be marked as blank.
-          </div>
-        )}
-        <div className="flex gap-3 pt-2">
-          <Button variant="outline" onClick={() => { setCurrentIdx(0); setPhase('taking'); }}>
-            <ChevronLeft className="mr-2 h-4 w-4" /> Go Back
-          </Button>
-          <Button onClick={() => handleSubmit()} disabled={submitting}>
-            {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-            Submit Assessment
-          </Button>
-        </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-6 text-sm font-medium pt-2 border-t mt-2 text-muted-foreground/80">
+                <span className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded bg-primary shadow-sm" />Answered: <strong className="text-foreground">{answeredCount}</strong></span>
+                <span className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded bg-yellow-400 dark:bg-yellow-600" />Skipped: <strong className="text-foreground">{skippedCount}</strong></span>
+                <span className="flex items-center gap-2"><span className="h-3.5 w-3.5 rounded bg-muted border border-border" />Untouched: <strong className="text-foreground">{questions.length - answeredCount - skippedCount}</strong></span>
+              </div>
+            </div>
+
+            {questions.length - answeredCount > 0 && (
+              <div className="rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/50 p-4 flex items-start gap-3 mt-4 text-amber-900 dark:text-amber-200">
+                <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <span className="font-bold">Warning:</span> {questions.length - answeredCount} unanswered question{(questions.length - answeredCount) !== 1 ? 's' : ''}. Unanswered questions will receive 0 points.
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-4 pt-6 mt-4 border-t items-center justify-between">
+              <Button size="lg" variant="outline" onClick={() => { setCurrentIdx(0); setPhase('taking'); }}>
+                <ChevronLeft className="mr-2 h-4 w-4" /> Return to Assessment
+              </Button>
+              <Button size="lg" onClick={() => handleSubmit(false)} disabled={submitting} className="min-w-[200px]">
+                {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                Submit Assessment
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        <ConfirmDialog
+          open={showSubmitConfirm}
+          onOpenChange={setShowSubmitConfirm}
+          title="Submit Assessment?"
+          description="Are you sure you want to submit your assessment? You cannot change your answers after submitting."
+          onConfirm={doSubmit}
+          loading={submitting}
+          confirmLabel="Yes, Submit Assessment"
+        />
       </div>
     );
   }
@@ -551,5 +590,18 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
     );
   }
 
-  return <LoadingSpinner />;
+  return (
+    <>
+      {phase !== 'taking' && phase !== 'review' && phase !== 'submitted' && phase !== 'start' && <LoadingSpinner />}
+      <ConfirmDialog
+        open={showSubmitConfirm}
+        onOpenChange={setShowSubmitConfirm}
+        title="Submit Assessment?"
+        description="Are you sure you want to submit your assessment? You cannot change your answers after submitting."
+        onConfirm={doSubmit}
+        loading={submitting}
+        confirmLabel="Yes, Submit Assessment"
+      />
+    </>
+  );
 }

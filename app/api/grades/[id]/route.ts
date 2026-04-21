@@ -17,29 +17,48 @@ export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   if (!['admin', 'faculty'].includes(role)) throw { status: 403, message: 'Access denied.' };
 
   const { id } = await ctx.params;
-  const offeringId = id; // id is offering_id
+  const offeringId = Number(id);
+
+  if (isNaN(offeringId)) throw { status: 400, message: 'Invalid ID format.' };
 
   if (role === 'faculty') {
     const offering = await query<any[]>('SELECT instructor_id FROM subject_offerings WHERE offering_id = ?', [offeringId]);
-    if (offering.length === 0 || offering[0].instructor_id !== payload.user_id) throw { status: 403, message: 'Access denied.' };
+    if (offering.length === 0 || offering[0].instructor_id !== payload.user_id) {
+      throw { status: 403, message: 'Access denied. You do not teach this offering.' };
+    }
   }
 
   const grades = await query<any[]>(
-    `SELECT e.enrollment_id, e.user_id, e.date_enrolled,
-            p.first_name, p.last_name, p.middle_name,
+    `SELECT e.enrollment_id, e.user_id,
+            p.first_name, p.last_name,
             u.email,
             g.grade_id, g.prelim_grade, g.midterm_grade, g.final_grade, g.remarks, g.is_finalized,
-            ROUND((COALESCE(g.prelim_grade,0) + COALESCE(g.midterm_grade,0) + COALESCE(g.final_grade,0)) / 3, 2) AS average
-     FROM grades g
-     JOIN enrollments e ON g.enrollment_id = e.enrollment_id
+            COALESCE(g.prelim_grade, 0) AS prelim,
+            COALESCE(g.midterm_grade, 0) AS midterm,
+            COALESCE(g.final_grade, 0) AS final
+     FROM enrollments e
      JOIN users u ON e.user_id = u.user_id
      LEFT JOIN profiles p ON p.user_id = u.user_id
-     WHERE g.offering_id = ? AND e.status = 'Enrolled'
+     JOIN subject_offerings so ON so.section_id = e.section_id
+     LEFT JOIN grades g ON g.enrollment_id = e.enrollment_id AND g.offering_id = so.offering_id
+     WHERE so.offering_id = ? AND e.status = 'Enrolled'
      ORDER BY p.last_name, p.first_name`,
     [offeringId]
   );
 
-  return json({ success: true, data: grades });
+  // Map to add averages in JS to be safer than ROUND in SQL if types are tricky
+  const mapped = grades.map(g => {
+    const p = g.prelim_grade ?? 0;
+    const m = g.midterm_grade ?? 0;
+    const f = g.final_grade ?? 0;
+    const avg = (Number(p) + Number(m) + Number(f)) / 3;
+    return {
+      ...g,
+      average: avg > 0 ? avg.toFixed(2) : '0.00'
+    };
+  });
+
+  return json({ success: true, data: mapped });
 });
 
 export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {

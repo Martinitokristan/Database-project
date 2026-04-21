@@ -21,8 +21,9 @@ import { sectionService } from '@/services/sectionService';
 import { subjectService } from '@/services/subjectService';
 import { semesterService } from '@/services/semesterService';
 import { toast } from 'sonner';
-import { Plus, Eye, Loader2, Layers, Users, ChevronRight, ChevronDown, BookOpen, X, Pencil } from 'lucide-react';
+import { BookOpen, X, Pencil, Mail, Calendar, Clock, MapPin, Users, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 const schema = z.object({
   subject_id:    z.string().min(1, 'Select subject'),
@@ -351,53 +352,184 @@ function AdminSections() {
 
 // ─── Faculty Card View ───────────────────────────────────────────────────────
 function FacultySections() {
-  const [offerings, setOfferings] = useState<any[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [selectedSection, setSelectedSection] = useState<any>(null);
+  const [students, setStudents]   = useState<any[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
 
   useEffect(() => {
-    // Subject Offering Service handles the instructor's offerings
-    fetch('/api/subject-offerings', { credentials: 'include' })
+    fetch('/api/schedules', { credentials: 'include' })
       .then(res => res.json())
       .then(r => {
-        if (r.success) setOfferings(r.data ?? []);
+        if (r.success) {
+          // Sort AM to PM
+          const sorted = (r.data ?? []).sort((a: any, b: any) => {
+            const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+            const dayDiff = days.indexOf(a.day_of_week) - days.indexOf(b.day_of_week);
+            if (dayDiff !== 0) return dayDiff;
+            return a.start_time.localeCompare(b.start_time);
+          });
+          setSchedules(sorted);
+        }
         setLoading(false);
       });
   }, []);
 
+  const viewStudents = async (section: any) => {
+    setSelectedSection(section);
+    setLoadingStudents(true);
+    setStudents([]);
+    try {
+      const res = await fetch(`/api/sections/${section.section_id}/enrollments`).then(r => r.json());
+      if (res.success) setStudents(res.data ?? []);
+    } finally {
+      setLoadingStudents(false);
+    }
+  };
+
+  const formatTime = (time: string) => {
+    if (!time) return '';
+    const [h, m] = time.split(':');
+    const hour = parseInt(h);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${m} ${ampm}`;
+  };
+
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div>
-      <PageHeader title="My Classes" description="Select a class to manage grades and schedule." />
-      {offerings.length === 0 ? (
-        <EmptyState title="No classes assigned" description="You have not been assigned to any subject offerings." />
+    <div className="space-y-6">
+      <PageHeader 
+        title="My Schedule" 
+        description="View your assigned classes and student enrollments." 
+      />
+      
+      {schedules.length === 0 ? (
+        <EmptyState title="No schedules found" description="You have not been assigned to any class schedules yet." />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {offerings.map(o => (
-            <Link key={o.offering_id} href={`/offerings/${o.offering_id}/grades`}>
-              <Card className="hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer h-full">
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <Layers className="h-5 w-5 text-primary" />
+        <Card>
+          <CardContent className="p-0">
+            <Accordion type="single" collapsible className="w-full">
+              {schedules.map((s) => (
+                <AccordionItem key={s.schedule_id} value={String(s.schedule_id)} className="border-b px-6 last:border-0 hover:bg-slate-50/50 transition-colors">
+                  <AccordionTrigger className="hover:no-underline py-6">
+                    <div className="flex flex-col md:flex-row md:items-center gap-4 text-left w-full">
+                      <div className="flex items-center gap-3 min-w-[140px]">
+                        <Calendar className="h-4 w-4 text-primary" />
+                        <span className="font-bold text-sm">{s.day_of_week}</span>
+                      </div>
+                      <div className="flex items-center gap-3 min-w-[180px]">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">{formatTime(s.start_time)} - {formatTime(s.end_time)}</span>
+                      </div>
+                      <div className="flex-1">
+                        <span className="font-bold text-slate-900">{s.subject_title}</span>
+                        <span className="ml-2 text-xs font-mono text-muted-foreground">({s.subject_code})</span>
+                      </div>
+                      <div className="md:text-right px-4">
+                        <Badge variant="secondary" className="font-bold uppercase tracking-tight">{s.section_name}</Badge>
+                      </div>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <p className="font-bold text-lg">{o.subject_title}</p>
-                  <p className="text-sm font-mono text-muted-foreground">{o.subject_code}</p>
-                  <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{o.section_name}</p>
-                  <div className="mt-3 flex items-center gap-2 flex-wrap">
-                    <Badge variant="outline" className="gap-1 text-xs">
-                      <Users className="h-3 w-3" />{o.enrolled_count}/{o.capacity}
-                    </Badge>
-                    <Badge variant="outline" className="text-xs">{o.term} {o.school_year}</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                      <Card className="bg-slate-50/50 border-dashed">
+                        <CardContent className="p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold uppercase text-slate-400">Class Details</span>
+                            <Link href={`/offerings/${s.offering_id}/grades`}>
+                              <Button size="sm" variant="outline" className="h-8 gap-2">
+                                <BookOpen className="h-3.5 w-3.5" /> Gradebook
+                              </Button>
+                            </Link>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm text-slate-600">
+                              <MapPin className="h-4 w-4" /> Room {s.room}
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-slate-600">
+                              <Users className="h-4 w-4" /> Instructor: {s.instructor_last || 'TBA'}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold uppercase text-slate-400">Quick Tools</span>
+                          <Button size="sm" variant="link" onClick={() => viewStudents(s)} className="h-auto p-0 text-primary">
+                            Refresh Student List
+                          </Button>
+                        </div>
+                        <Button 
+                          className="w-full justify-start gap-2" 
+                          variant="secondary"
+                          onClick={() => viewStudents(s)}
+                        >
+                          <Users className="h-4 w-4" /> View Enrolled Students
+                        </Button>
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </CardContent>
+        </Card>
       )}
+
+      {/* Enrolled Students Modal */}
+      <Dialog open={!!selectedSection} onOpenChange={o => !o && setSelectedSection(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Enrollment List: {selectedSection?.section_name}</DialogTitle>
+            <DialogDescription>
+              {selectedSection?.subject_title} ({selectedSection?.subject_code})
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-2">
+            {loadingStudents ? (
+              <div className="h-32 flex items-center justify-center"><Loader2 className="animate-spin" /></div>
+            ) : students.length === 0 ? (
+              <p className="py-12 text-center text-muted-foreground italic">No students enrolled yet.</p>
+            ) : (
+              <div className="rounded-md border max-h-[400px] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Student ID</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Year Level</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {students.map((st: any) => (
+                      <TableRow key={st.enrollment_id}>
+                        <TableCell className="font-mono text-xs">{st.student_id}</TableCell>
+                        <TableCell className="font-medium">{st.last_name}, {st.first_name}</TableCell>
+                        <TableCell>{st.year_level}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Mail className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedSection(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

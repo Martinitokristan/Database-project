@@ -17,7 +17,8 @@ import { format } from 'date-fns';
 import { 
   CheckCircle2, Clock, XCircle, Users, 
   Calendar as CalendarIcon, Download, Save, 
-  ChevronLeft, ChevronRight, CheckSquare, RefreshCw, FileText
+  ChevronLeft, ChevronRight, CheckSquare, RefreshCw, FileText,
+  Triangle, Circle, Check
 } from 'lucide-react';
 import { reports } from '@/lib/reports';
 
@@ -34,6 +35,7 @@ export default function AttendancePage() {
   const [summary, setSummary] = useState<any[]>([]);
   const [fetching, setFetching] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [viewMode, setViewMode] = useState<'daily' | 'grid'>('daily');
 
   // Load assigned sections
   const loadSections = useCallback(async () => {
@@ -245,81 +247,155 @@ export default function AttendancePage() {
           </Card>
         </div>
 
-        {/* RIGHT PANEL: Attendance Grid */}
+        {/* RIGHT PANEL: Attendance View */}
         <div className="flex-1 min-w-0">
-          <Card className="border-none shadow-xl overflow-hidden min-h-[500px]">
-            <CardContent className="p-0">
-              {fetching ? <div className="h-96 flex items-center justify-center bg-muted/20"><LoadingSpinner /></div> : (
-                <>
-                  <div className="p-6 bg-muted/10 border-b flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-bold tracking-tight">Roster Management</h3>
-                      <p className="text-xs text-muted-foreground font-medium">Showing enrollment list for {currentSection?.section_name}</p>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                       <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-emerald-500" /> Present </div>
-                       <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-amber-500" /> Late </div>
-                       <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-rose-500" /> Absent </div>
-                    </div>
-                  </div>
-                  
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader className="bg-muted/30">
+          <Card className="border-none shadow-xl overflow-hidden min-h-[600px] flex flex-col">
+            <div className="p-4 bg-muted/10 border-b flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                 <div className="hidden sm:block">
+                   <h3 className="text-lg font-bold tracking-tight">Roster Management</h3>
+                   <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{currentSection?.section_name}</p>
+                 </div>
+                 <Tabs value={viewMode} onValueChange={(v: any) => setViewMode(v)} className="w-[200px]">
+                   <TabsList className="grid w-full grid-cols-2">
+                     <TabsTrigger value="daily" className="text-xs">Daily</TabsTrigger>
+                     <TabsTrigger value="grid" className="text-xs">Matrix</TabsTrigger>
+                   </TabsList>
+                 </Tabs>
+              </div>
+              <div className="hidden md:flex items-center gap-4 text-[9px] font-black text-muted-foreground uppercase tracking-widest">
+                 <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-emerald-500" /> Present </div>
+                 <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-amber-500" /> Late </div>
+                 <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-rose-500" /> Absent </div>
+              </div>
+            </div>
+
+            <CardContent className="p-0 flex-1 overflow-hidden flex flex-col">
+              {fetching ? (
+                <div className="flex-1 flex items-center justify-center bg-muted/20">
+                  <LoadingSpinner />
+                </div>
+              ) : viewMode === 'daily' ? (
+                /* ── Daily View ── */
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow>
+                        <TableHead className="w-[80px] pl-6 font-black uppercase text-[10px]">ID</TableHead>
+                        <TableHead className="font-black uppercase text-[10px]">Student Name</TableHead>
+                        <TableHead className="text-center font-black uppercase text-[10px]">Status Marker</TableHead>
+                        <TableHead className="text-right pr-6 font-black uppercase text-[10px]">Participation</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {students.map((s) => {
+                        const status = getStatus(s.enrollment_id);
+                        const studSummary = summary.find(sm => sm.user_id === s.user_id);
+                        
+                        return (
+                          <TableRow key={s.user_id} className="hover:bg-muted/5 transition-colors group">
+                            <TableCell className="font-mono text-xs pl-6 text-muted-foreground group-hover:text-foreground">{s.user_id}</TableCell>
+                            <TableCell className="font-bold">{s.full_name}</TableCell>
+                            <TableCell className="flex justify-center p-2">
+                              <div className="inline-flex bg-muted/30 p-1.5 rounded-full shadow-inner gap-1">
+                                <button 
+                                  onClick={() => handleMark(s.enrollment_id, s.user_id, 'Present')}
+                                  className={`p-2 rounded-full transition-all duration-200 ${status === 'Present' ? 'bg-emerald-500 text-white shadow-lg ring-2 ring-emerald-500/20' : 'text-muted-foreground hover:bg-muted-foreground/10'}`}>
+                                  <CheckCircle2 className="h-4 w-4" />
+                                </button>
+                                <button 
+                                  onClick={() => handleMark(s.enrollment_id, s.user_id, 'Late')}
+                                  className={`p-2 rounded-full transition-all duration-200 ${status === 'Late' ? 'bg-amber-500 text-white shadow-lg ring-2 ring-amber-500/20' : 'text-muted-foreground hover:bg-muted-foreground/10'}`}>
+                                  <Circle className="h-4 w-4 fill-current" />
+                                </button>
+                                <button 
+                                  onClick={() => handleMark(s.enrollment_id, s.user_id, 'Absent')}
+                                  className={`p-2 rounded-full transition-all duration-200 ${status === 'Absent' ? 'bg-rose-500 text-white shadow-lg ring-2 ring-rose-500/20' : 'text-muted-foreground hover:bg-muted-foreground/10'}`}>
+                                  <Triangle className="h-4 w-4 fill-current" />
+                                </button>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right pr-6">
+                              <span className={`text-xs font-black tracking-tight ${studSummary?.percent > 85 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                                {studSummary?.percent ?? 0}%
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                /* ── Matrix/Grid View ── */
+                <div className="flex-1 overflow-auto">
+                  <div className="inline-block min-w-full">
+                    <Table className="border-collapse">
+                      <TableHeader className="bg-slate-50 sticky top-0 z-20">
                         <TableRow>
-                          <TableHead className="w-[80px] pl-6">ID</TableHead>
-                          <TableHead>Student Name</TableHead>
-                          <TableHead className="text-center">Status Marker</TableHead>
-                          <TableHead className="text-right pr-6">Participation</TableHead>
+                          <TableHead className="w-[200px] font-black uppercase text-[10px] bg-slate-50 border-r z-30 sticky left-0 pl-6">Student</TableHead>
+                          <TableHead className="w-[120px] font-black uppercase text-[10px] bg-slate-50 border-r text-center px-2">Stats</TableHead>
+                          {/* Get unique dates from records */}
+                          {Array.from(new Set(records.map(r => format(new Date(r.date), 'MMM dd'))))
+                            .sort((a,b) => new Date(b).getTime() - new Date(a).getTime())
+                            .map(date => (
+                              <TableHead key={date} className="w-[80px] font-bold text-[10px] text-center border-r px-2 whitespace-nowrap">
+                                {date}
+                              </TableHead>
+                            ))}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {students.map((s) => {
-                          const status = getStatus(s.enrollment_id);
-                          const studSummary = summary.find(sm => sm.user_id === s.user_id);
-                          
-                          return (
-                            <TableRow key={s.user_id} className="hover:bg-muted/5 transition-colors group">
-                              <TableCell className="font-mono text-xs pl-6 text-muted-foreground group-hover:text-foreground">{s.user_id}</TableCell>
-                              <TableCell className="font-bold">{s.full_name}</TableCell>
-                              <TableCell className="flex justify-center p-2">
-                                <div className="inline-flex bg-muted/30 p-1.5 rounded-full shadow-inner gap-1">
-                                  <button 
-                                    onClick={() => handleMark(s.enrollment_id, s.user_id, 'Present')}
-                                    className={`p-2 rounded-full transition-all duration-200 ${status === 'Present' ? 'bg-emerald-500 text-white shadow-lg ring-2 ring-emerald-500/20' : 'text-muted-foreground hover:bg-muted-foreground/10'}`}>
-                                    <CheckCircle2 className="h-4.5 w-4.5" />
-                                  </button>
-                                  <button 
-                                    onClick={() => handleMark(s.enrollment_id, s.user_id, 'Late')}
-                                    className={`p-2 rounded-full transition-all duration-200 ${status === 'Late' ? 'bg-amber-500 text-white shadow-lg ring-2 ring-amber-500/20' : 'text-muted-foreground hover:bg-muted-foreground/10'}`}>
-                                    <Clock className="h-4.5 w-4.5" />
-                                  </button>
-                                  <button 
-                                    onClick={() => handleMark(s.enrollment_id, s.user_id, 'Absent')}
-                                    className={`p-2 rounded-full transition-all duration-200 ${status === 'Absent' ? 'bg-rose-500 text-white shadow-lg ring-2 ring-rose-500/20' : 'text-muted-foreground hover:bg-muted-foreground/10'}`}>
-                                    <XCircle className="h-4.5 w-4.5" />
-                                  </button>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right pr-6">
-                                <span className={`text-xs font-black tracking-tight ${studSummary?.percent > 85 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                                  {studSummary?.percent ?? 0}%
-                                </span>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
+                        {summary.map((s) => (
+                          <TableRow key={s.user_id} className="hover:bg-slate-50/50 h-10 transition-colors">
+                            <TableCell className="font-bold text-xs sticky left-0 bg-white border-r pl-6 z-10 w-[200px]">
+                              {s.full_name}
+                            </TableCell>
+                            <TableCell className="border-r px-2">
+                               <div className="flex items-center justify-center gap-3">
+                                  <div className="flex items-center gap-1">
+                                    <Check className="h-3 w-3 text-emerald-500" />
+                                    <span className="text-[10px] font-black">{s.present}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Triangle className="h-2.5 w-2.5 text-rose-500 fill-current" />
+                                    <span className="text-[10px] font-black">{s.absent}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Circle className="h-2.5 w-2.5 text-amber-500 fill-current" />
+                                    <span className="text-[10px] font-black">{s.late}</span>
+                                  </div>
+                               </div>
+                            </TableCell>
+                            {/* Render status for each date */}
+                            {Array.from(new Set(records.map(r => format(new Date(r.date), 'MMM dd'))))
+                              .sort((a,b) => new Date(b).getTime() - new Date(a).getTime())
+                              .map(date => {
+                                const record = records.find(r => r.user_id === s.user_id && format(new Date(r.date), 'MMM dd') === date);
+                                return (
+                                  <TableCell key={date} className="text-center border-r p-0 h-10 w-[80px]">
+                                    <div className="flex items-center justify-center h-full w-full">
+                                      {record?.status === 'Present' && <Check className="h-4 w-4 text-emerald-500" />}
+                                      {record?.status === 'Absent' && <Triangle className="h-3.5 w-3.5 text-rose-500 fill-current" />}
+                                      {record?.status === 'Late' && <Circle className="h-3.5 w-3.5 text-amber-500 fill-current" />}
+                                      {!record && <span className="text-slate-200">−</span>}
+                                    </div>
+                                  </TableCell>
+                                );
+                              })}
+                          </TableRow>
+                        ))}
                       </TableBody>
                     </Table>
                   </div>
-                  
-                  {students.length === 0 && (
-                     <div className="py-20 flex flex-col items-center justify-center opacity-40">
-                        <Users className="h-12 w-12 mb-2" />
-                        <p className="font-bold">No students enrolled in this section.</p>
-                     </div>
-                  )}
-                </>
+                </div>
+              )}
+              
+              {students.length === 0 && !fetching && (
+                 <div className="flex-1 flex flex-col items-center justify-center opacity-40">
+                    <Users className="h-12 w-12 mb-2" />
+                    <p className="font-bold text-sm">No students enrolled</p>
+                 </div>
               )}
             </CardContent>
           </Card>

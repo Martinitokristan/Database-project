@@ -449,37 +449,44 @@ export default function AcademicPortal() {
                                   </div>
 
                                   {expandedSubjects.includes(s.subject_id) && (
-                                    <div className="mt-3 space-y-2 w-full max-w-[280px] animate-in slide-in-from-top-2 duration-200 text-left">
+                                    <div className="mt-4 space-y-1 w-full max-w-[320px] animate-in slide-in-from-top-2 duration-300 text-left">
+                                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-1">Assigned Sections</div>
                                       {subOfferings.map(off => (
                                         <div 
                                           key={off.offering_id} 
-                                          className="group/sec flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-2 pl-3 shadow-sm hover:border-indigo-300 hover:bg-white transition-all"
+                                          className="group/sec border border-slate-200 bg-white shadow-sm hover:border-indigo-300 transition-all"
                                         >
-                                          <div className="flex flex-col">
-                                            <span className="text-[10px] font-black text-slate-800">{off.section_name}</span>
-                                            <span className="text-[9px] text-indigo-500 font-bold uppercase tracking-tight">
-                                              {off.instructor_last ? `${off.instructor_last}` : 'TBA'}
-                                            </span>
-                                          </div>
-                                          
-                                          <div className="flex items-center gap-1 opacity-0 group-hover/sec:opacity-100 transition-opacity">
-                                            <Link href={`/sections/${off.section_id}`} target="_blank">
-                                              <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full">
-                                                <Eye className="h-3.5 w-3.5" />
+                                          <div className="flex items-center justify-between p-2 pl-3">
+                                            <div className="flex flex-col">
+                                              <span className="text-[11px] font-bold text-slate-800">{off.section_name}</span>
+                                              <span className="text-[9px] text-indigo-500 font-medium uppercase truncate max-w-[120px]">
+                                                {off.instructor_last ? `${off.instructor_last}` : 'TBA'}
+                                              </span>
+                                            </div>
+                                            
+                                            <div className="flex items-center gap-1.5 pr-1">
+                                              <Link href={`/sections/${off.section_id}`} target="_blank" title="View Section Detail">
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+                                                  <Eye className="h-3.5 w-3.5" />
+                                                </Button>
+                                              </Link>
+                                              <Button 
+                                                variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                                                onClick={() => setEditOfferingTarget(off)}
+                                                title="Edit Assignment"
+                                              >
+                                                <Pencil className="h-3.5 w-3.5" />
                                               </Button>
-                                            </Link>
-                                            <Button 
-                                              variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-full"
-                                              onClick={() => setEditOfferingTarget(off)}
-                                            >
-                                              <Pencil className="h-3.5 w-3.5" />
-                                            </Button>
-                                            <Button 
-                                              variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full"
-                                              onClick={() => setDeleteSectionTarget(off)}
-                                            >
-                                              <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
+                                              <Button 
+                                                variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                onClick={() => setDeleteSectionTarget(off)}
+                                                title="Remove Assignment"
+                                              >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                              </Button>
+                                              <div className="h-4 w-px bg-slate-100 mx-0.5" />
+                                              <ChevronDown className="h-3 w-3 text-slate-300 group-hover/sec:text-indigo-400 transition-colors mr-1" />
+                                            </div>
                                           </div>
                                         </div>
                                       ))}

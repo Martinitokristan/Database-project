@@ -3,7 +3,7 @@ import { query } from '@/lib/db';
 import { requireRole, apiHandler, json } from '@/lib/middleware';
 
 export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
-  requireRole(req, ['admin']);
+  requireRole(req, ['admin', 'faculty']);
   const { id } = await ctx.params;
   const sectionId = Number(id);
 

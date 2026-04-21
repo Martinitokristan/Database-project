@@ -32,6 +32,10 @@ export const GET = apiHandler(async (req: NextRequest) => {
     whereClauses.push('so.section_id = ?');
     params.push(sectionId);
   }
+  if (payload.role_name.toLowerCase() === 'faculty') {
+    whereClauses.push('so.instructor_id = ?');
+    params.push(payload.user_id);
+  }
 
   const where = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 

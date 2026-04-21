@@ -25,17 +25,19 @@ export default function CreateAssessmentPage() {
 
 function CreateForm() {
   const router = useRouter();
-  const [sections, setSections] = useState<any[]>([]);
-  const [saving,   setSaving]   = useState(false);
+  const [offerings, setOfferings] = useState<any[]>([]);
+  const [saving,    setSaving]   = useState(false);
   const [form, setForm] = useState({
     title: '',
     description: '',
     assessment_type: 'Quiz',
-    section_id: '',
+    offering_id: '',
   });
 
   useEffect(() => {
-    sectionService.list().then(r => { if (r.success) setSections(r.data ?? []); });
+    import('@/services/subjectOfferingService').then(({ subjectOfferingService }) => {
+      subjectOfferingService.list().then(r => { if (r.success) setOfferings(r.data ?? []); });
+    });
   }, []);
 
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })); }
@@ -43,14 +45,14 @@ function CreateForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.title.trim())    { toast.error('Title is required.'); return; }
-    if (!form.section_id)      { toast.error('Please select a section.'); return; }
+    if (!form.offering_id)     { toast.error('Please select a subject offering.'); return; }
     if (!form.assessment_type) { toast.error('Please select a type.'); return; }
     setSaving(true);
     const res = await assessmentService.create({
       title:           form.title.trim(),
       description:     form.description || null,
       assessment_type: form.assessment_type,
-      section_id:      Number(form.section_id),
+      offering_id:     Number(form.offering_id),
     });
     setSaving(false);
     if (!res.success) { toast.error(res.message || 'Failed to create assessment.'); return; }
@@ -104,18 +106,18 @@ function CreateForm() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Section <span className="text-destructive">*</span></Label>
-                  <Select value={form.section_id} onValueChange={v => set('section_id', v)}>
+                  <Label>Subject & Section <span className="text-destructive">*</span></Label>
+                  <Select value={form.offering_id} onValueChange={v => set('offering_id', v)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select section" />
+                      <SelectValue placeholder="Select class" />
                     </SelectTrigger>
                     <SelectContent position="popper" className="z-50 max-h-60">
-                      {sections.length === 0 ? (
-                        <div className="px-2 py-3 text-sm text-muted-foreground">No sections available</div>
+                      {offerings.length === 0 ? (
+                        <div className="px-2 py-3 text-sm text-muted-foreground">No classes available</div>
                       ) : (
-                        sections.map(s => (
-                          <SelectItem key={s.section_id} value={String(s.section_id)}>
-                            {s.section_name} — {s.subject_code}
+                        offerings.map(o => (
+                          <SelectItem key={o.offering_id} value={String(o.offering_id)}>
+                            {o.section_name} — {o.subject_code}
                           </SelectItem>
                         ))
                       )}
