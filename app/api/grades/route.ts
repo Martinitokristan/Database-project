@@ -9,6 +9,7 @@ const UpsertGradeSchema = z.object({
   enrollment_id: z.number(),
   prelim_grade:  z.number().min(0).max(100).nullable().optional(),
   midterm_grade: z.number().min(0).max(100).nullable().optional(),
+  semi_final_grade: z.number().min(0).max(100).nullable().optional(),
   final_grade:   z.number().min(0).max(100).nullable().optional(),
 });
 
@@ -24,7 +25,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
     return json({ success: false, message: 'Validation failed.', data: parsed.error.flatten() }, 422);
   }
 
-  const { offering_id, enrollment_id, prelim_grade, midterm_grade, final_grade } = parsed.data;
+  const { offering_id, enrollment_id, prelim_grade, midterm_grade, semi_final_grade, final_grade } = parsed.data;
 
   // Check access and finalized status
   if (role === 'faculty') {
@@ -39,7 +40,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
     [offering_id, enrollment_id]
   );
 
-  let p = prelim_grade, m = midterm_grade, f = final_grade, r = null;
+  let p = prelim_grade, m = midterm_grade, s = semi_final_grade, f = final_grade, r = null;
 
   if (existing.length > 0) {
     if (role === 'faculty' && existing[0].is_finalized) {
@@ -48,21 +49,24 @@ export const POST = apiHandler(async (req: NextRequest) => {
     const current = existing[0];
     p = p !== undefined ? p : current.prelim_grade;
     m = m !== undefined ? m : current.midterm_grade;
+    s = s !== undefined ? s : current.semi_final_grade;
     f = f !== undefined ? f : current.final_grade;
-    r = computeRemarks(p, m, f);
+    // Compute remarks strictly using midterm and final (per user plan choice)
+    r = computeRemarks(p ?? null, m ?? null, f ?? null);
     await query(
-      'UPDATE grades SET prelim_grade = ?, midterm_grade = ?, final_grade = ?, remarks = ? WHERE grade_id = ?',
-      [p, m, f, r, current.grade_id]
+      'UPDATE grades SET prelim_grade = ?, midterm_grade = ?, semi_final_grade = ?, final_grade = ?, remarks = ? WHERE grade_id = ?',
+      [p, m, s, f, r, current.grade_id]
     );
   } else {
     // defaults to null if undefined
     p = p ?? null;
     m = m ?? null;
+    s = s ?? null;
     f = f ?? null;
-    r = computeRemarks(p, m, f);
+    r = computeRemarks(p ?? null, m ?? null, f ?? null);
     await query(
-      'INSERT INTO grades (offering_id, enrollment_id, prelim_grade, midterm_grade, final_grade, remarks) VALUES (?, ?, ?, ?, ?, ?)',
-      [offering_id, enrollment_id, p, m, f, r]
+      'INSERT INTO grades (offering_id, enrollment_id, prelim_grade, midterm_grade, semi_final_grade, final_grade, remarks) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [offering_id, enrollment_id, p, m, s, f, r]
     );
   }
 

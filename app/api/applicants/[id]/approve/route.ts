@@ -4,31 +4,17 @@ import { requireRole, apiHandler, json } from '@/lib/middleware';
 import { generateStudentId, generateDefaultPassword, hashPassword } from '@/lib/auth';
 import { sendEmail, buildApprovalEmail } from '@/lib/brevo';
 
-/**
- * Generate a unique acadtrack email: firstname.lastname@acadtrack.edu.ph
- * If duplicate, append a number: firstname.lastname2@acadtrack.edu.ph
- */
-async function generateAcadtrackEmail(
-  conn: any,
-  firstName: string,
-  lastName: string
-): Promise<string> {
+async function generateAcadtrackEmail(conn: any, firstName: string, lastName: string): Promise<string> {
   const base = `${firstName.toLowerCase().trim()}.${lastName.toLowerCase().trim()}`;
   const domain = 'acadtrack.edu.ph';
   let candidate = `${base}@${domain}`;
   let counter = 1;
-
-  // eslint-disable-next-line no-constant-condition
   while (true) {
-    const [rows] = await conn.execute(
-      'SELECT user_id FROM users WHERE email = ?',
-      [candidate]
-    );
+    const [rows] = await conn.execute('SELECT user_id FROM users WHERE email = ?', [candidate]);
     if ((rows as any[]).length === 0) break;
     counter++;
     candidate = `${base}${counter}@${domain}`;
   }
-
   return candidate;
 }
 
@@ -36,46 +22,50 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   requireRole(req, ['admin']);
   const { id } = await ctx.params;
 
-  // Fetch the profile inside a transaction
   const result = await transaction(async (conn) => {
+    // Fetch profile — status now lives in applications table
     const [profiles] = await conn.execute(
-      'SELECT * FROM profiles WHERE profile_id = ? AND applicant_status = "Pending" FOR UPDATE',
+      `SELECT p.*, app.application_id, app.applicant_status AS app_status
+       FROM profiles p
+       LEFT JOIN applications app ON app.profile_id = p.profile_id
+       WHERE p.profile_id = ?
+       FOR UPDATE`,
       [id]
     ) as any;
     const profile = (profiles as any[])[0];
-    if (!profile) throw { status: 404, message: 'Applicant not found or already processed.' };
+    if (!profile) throw { status: 404, message: 'Applicant not found.' };
+    if (profile.app_status && profile.app_status !== 'Pending') {
+      throw { status: 409, message: 'Applicant has already been processed.' };
+    }
 
-    // Generate acadtrack email
     const acadtrackEmail = await generateAcadtrackEmail(conn, profile.first_name, profile.last_name);
-
-    // Generate student ID and temporary password
     const userId = await generateStudentId(conn);
     const tempPassword = generateDefaultPassword(profile.last_name);
     const hashedPassword = await hashPassword(tempPassword);
 
-    // Create user account
     await conn.execute(
       'INSERT INTO users (user_id, email, password_hash, role_id, must_change_password) VALUES (?, ?, ?, 3, TRUE)',
       [userId, acadtrackEmail, hashedPassword]
     );
 
-    // Update profile: link to user, update status
-    await conn.execute(
-      'UPDATE profiles SET user_id = ?, applicant_status = "Enrolled" WHERE profile_id = ?',
-      [userId, id]
-    );
+    // Link profile AND application to new user
+    await conn.execute('UPDATE profiles SET user_id = ? WHERE profile_id = ?', [userId, id]);
 
-    return {
-      userId,
-      acadtrackEmail,
-      tempPassword,
-      personalEmail: profile.personal_email,
-      firstName: profile.first_name,
-      lastName: profile.last_name,
-    };
+    if (profile.application_id) {
+      await conn.execute(
+        'UPDATE applications SET user_id = ?, applicant_status = ?, updated_at = NOW() WHERE application_id = ?',
+        [userId, 'Enrolled', profile.application_id]
+      );
+    } else {
+      await conn.execute(
+        'INSERT INTO applications (user_id, profile_id, course_id, applicant_status, updated_at) VALUES (?, ?, ?, ?, NOW())',
+        [userId, id, profile.course_id, 'Enrolled']
+      );
+    }
+
+    return { userId, acadtrackEmail, tempPassword, personalEmail: profile.personal_email, firstName: profile.first_name, lastName: profile.last_name };
   });
 
-  // Send email notification to the student's personal email (fire-and-forget)
   sendEmail({
     to: { email: result.personalEmail, name: `${result.firstName} ${result.lastName}` },
     subject: 'AcadTrack — Your Application Has Been Approved!',
@@ -90,10 +80,7 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
 
   return json({
     success: true,
-    data: {
-      user_id: result.userId,
-      acadtrack_email: result.acadtrackEmail,
-    },
+    data: { user_id: result.userId, acadtrack_email: result.acadtrackEmail },
     message: 'Applicant approved. Account created and email sent.',
   });
 });

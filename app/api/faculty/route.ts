@@ -13,7 +13,7 @@ const CreateFacultySchema = z.object({
   personal_email: z.string().email(),
   gender:         z.enum(['Male', 'Female', 'Other']),
   date_of_birth:  z.string().min(1),
-  phone:          z.string().min(7).max(20),
+  phone:          z.string().length(11, 'Phone must be exactly 11 digits'),
   address:        z.string().min(1),
   temp_password:  z.string().min(8),
 });

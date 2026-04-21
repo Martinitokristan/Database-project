@@ -23,15 +23,15 @@ import { Plus, Eye, Loader2, X } from 'lucide-react';
 
 const schema = z.object({
   first_name:    z.string().min(1),
-  middle_name:   z.string().optional(),
+  middle_name:   z.string().optional().nullable(),
   last_name:     z.string().min(1),
   email:         z.string().email(),
   personal_email: z.string().email(),
   gender:        z.enum(['Male', 'Female', 'Other']),
   date_of_birth: z.string().min(1),
-  phone:         z.string().min(7),
+  phone:         z.string().length(11, 'Must be 11 digits'),
   address:       z.string().min(5),
-  temp_password: z.string().min(8, 'Required (min 8 chars)'),
+  temp_password: z.string().min(7, 'Required (4 letters + 3 numbers)'),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -46,11 +46,31 @@ export default function FacultyPage() {
   const [toggleTarget, setToggleTarget] = useState<any>(null);
   const [toggling, setToggling]       = useState(false);
 
-  const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, setValue, reset, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
 
+  const firstName = watch('first_name');
+  const lastName  = watch('last_name');
+
   useEffect(() => { register('gender'); }, [register]);
+
+  const generateCredentials = useCallback(() => {
+    if (!firstName || !lastName) return;
+    const letters = 'abcdefghijklmnopqrstuvwxyz';
+    const nums    = '0123456789';
+    let randLetters = '';
+    let randNums = '';
+    for (let i = 0; i < 4; i++) randLetters += letters.charAt(Math.floor(Math.random() * letters.length));
+    for (let i = 0; i < 3; i++) randNums += nums.charAt(Math.floor(Math.random() * nums.length));
+    
+    const suffix = `${randLetters}${randNums}`;
+    const generatedEmail = `${firstName.toLowerCase()}.${lastName.toLowerCase()}.${suffix}@acadtrack.edu`.replace(/\s+/g, '');
+    const generatedPass  = suffix.toUpperCase(); // Or follow the exact 4+3 rule for password too
+
+    setValue('email', generatedEmail);
+    setValue('temp_password', generatedPass);
+  }, [firstName, lastName, setValue]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -111,7 +131,7 @@ export default function FacultyPage() {
       <PageHeader
         title="Faculty"
         description="Manage faculty members"
-        action={<Button onClick={() => { reset(); setOpen(true); }}><Plus className="mr-2 h-4 w-4" />Add Faculty</Button>}
+        action={<Button onClick={() => { reset(); setOpen(true); }}><Plus className="mr-2 h-4 w-4" />Add Faculty member</Button>}
       />
 
       <Card>
@@ -180,15 +200,29 @@ export default function FacultyPage() {
           </DialogHeader>
           <div className="p-6">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5"><Label className="text-[11px] font-bold uppercase tracking-wider">First Name</Label><Input {...register('first_name')} />{errors.first_name && <p className="text-xs text-destructive">{errors.first_name.message}</p>}</div>
+                <div className="space-y-1.5"><Label className="text-[11px] font-bold uppercase tracking-wider">Middle Name</Label><Input {...register('middle_name')} /></div>
                 <div className="space-y-1.5"><Label className="text-[11px] font-bold uppercase tracking-wider">Last Name</Label><Input {...register('last_name')} />{errors.last_name && <p className="text-xs text-destructive">{errors.last_name.message}</p>}</div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5"><Label className="text-[11px] font-bold uppercase tracking-wider">Institutional Email</Label><Input type="email" {...register('email')} placeholder="official@acadtrack.edu" />{errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}</div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[11px] font-bold uppercase tracking-wider">Institutional Email</Label>
+                    <button type="button" onClick={generateCredentials} className="text-[10px] text-indigo-600 hover:underline font-bold">Auto-gen</button>
+                  </div>
+                  <Input type="email" {...register('email')} placeholder="official@acadtrack.edu" />
+                  {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+                </div>
                 <div className="space-y-1.5"><Label className="text-[11px] font-bold uppercase tracking-wider">Personal Email</Label><Input type="email" {...register('personal_email')} placeholder="personal@gmail.com" />{errors.personal_email && <p className="text-xs text-destructive">{errors.personal_email.message}</p>}</div>
               </div>
-              <div className="space-y-1.5"><Label className="text-[11px] font-bold uppercase tracking-wider">Temporary Password</Label><Input type="text" {...register('temp_password')} placeholder="Specify initial password..." />{errors.temp_password && <p className="text-xs text-destructive">{errors.temp_password.message}</p>}</div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-[11px] font-bold uppercase tracking-wider">Temporary Password</Label>
+                </div>
+                <Input type="text" {...register('temp_password')} placeholder="Specify or auto-generate..." />
+                {errors.temp_password && <p className="text-xs text-destructive">{errors.temp_password.message}</p>}
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-[11px] font-bold uppercase tracking-wider">Gender</Label>
@@ -203,7 +237,7 @@ export default function FacultyPage() {
                 </div>
                 <div className="space-y-1.5"><Label className="text-[11px] font-bold uppercase tracking-wider">Date of Birth</Label><Input type="date" {...register('date_of_birth')} /></div>
               </div>
-              <div className="space-y-1.5"><Label className="text-[11px] font-bold uppercase tracking-wider">Phone Number</Label><Input {...register('phone')} /></div>
+              <div className="space-y-1.5"><Label className="text-[11px] font-bold uppercase tracking-wider">Phone Number</Label><Input {...register('phone')} maxLength={11} placeholder="09XXXXXXXXX" />{errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}</div>
               <div className="space-y-1.5"><Label className="text-[11px] font-bold uppercase tracking-wider">Physical Address</Label><Input {...register('address')} /></div>
               <DialogFooter className="mt-6">
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

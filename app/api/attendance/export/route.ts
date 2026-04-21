@@ -14,12 +14,13 @@ export const GET = apiHandler(async (req: NextRequest) => {
     return new Response('Missing parameters', { status: 400 });
   }
 
-  // Get records
+  // Get records — join through enrollments (user_id/section_id no longer stored in attendance)
   const results = await query<any[]>(
-    `SELECT a.date, a.status, p.first_name, p.last_name, p.user_id
+    `SELECT a.date, a.status, p.first_name, p.last_name, e.user_id
      FROM attendance a
-     JOIN profiles p ON a.user_id = p.user_id
-     WHERE a.section_id = ? AND MONTH(a.date) = ? AND YEAR(a.date) = ?
+     JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+     JOIN profiles p ON e.user_id = p.user_id
+     WHERE e.section_id = ? AND MONTH(a.date) = ? AND YEAR(a.date) = ?
      ORDER BY p.last_name, p.first_name, a.date`,
     [sectionId, month, year]
   );

@@ -1,4 +1,4 @@
-import { query } from './lib/db';
+import { query } from '../lib/db';
 
 async function migrate() {
   console.log('Running migration...');

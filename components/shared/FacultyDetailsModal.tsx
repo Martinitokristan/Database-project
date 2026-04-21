@@ -17,9 +17,10 @@ import { cn } from '@/lib/utils';
 
 const editSchema = z.object({
   first_name:     z.string().min(1, 'Required'),
+  middle_name:    z.string().optional().nullable(),
   last_name:      z.string().min(1, 'Required'),
   personal_email: z.string().email().optional().or(z.literal('')),
-  phone:          z.string().min(7, 'Required'),
+  phone:          z.string().length(11, 'Must be 11 digits'),
   gender:         z.enum(['Male', 'Female', 'Other']),
   date_of_birth:  z.string().min(1, 'Required'),
   address:        z.string().min(5, 'Required'),
@@ -57,6 +58,7 @@ export function FacultyDetailsModal({
     if (faculty) {
       reset({
         first_name:     faculty.first_name || '',
+        middle_name:    faculty.middle_name || '',
         last_name:      faculty.last_name || '',
         personal_email: faculty.personal_email || '',
         phone:          faculty.phone || '',
@@ -92,7 +94,7 @@ export function FacultyDetailsModal({
             Faculty Details
           </p>
           <h2 className="text-white text-xl font-bold">
-            {faculty.first_name} {faculty.last_name}
+            {faculty.first_name} {faculty.middle_name ? `${faculty.middle_name} ` : ''}{faculty.last_name}
           </h2>
           <p className="text-white/60 text-sm mt-0.5">{faculty.email}</p>
         </div>
@@ -105,7 +107,7 @@ export function FacultyDetailsModal({
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4 bg-white">
 
             {/* Name row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   First Name
@@ -114,6 +116,12 @@ export function FacultyDetailsModal({
                 {errors.first_name && (
                   <p className="text-xs text-red-500">{errors.first_name.message}</p>
                 )}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Middle Name
+                </Label>
+                <Input {...register('middle_name')} className="h-9 text-sm" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">

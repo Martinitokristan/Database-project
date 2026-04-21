@@ -20,12 +20,20 @@ export const POST = apiHandler(async (req: NextRequest) => {
   const { applicant_id, section_id } = parsed.data;
 
   const studentId = await transaction(async (conn) => {
+    // Fetch profile — status now in applications table
     const [profiles] = await conn.execute(
-      'SELECT * FROM profiles WHERE profile_id = ? AND applicant_status = "Pending" FOR UPDATE',
+      `SELECT p.*, app.application_id, app.status AS app_status
+       FROM profiles p
+       LEFT JOIN applications app ON app.user_id = p.user_id
+       WHERE p.profile_id = ?
+       FOR UPDATE`,
       [applicant_id]
     ) as any;
     const profile = (profiles as any[])[0];
     if (!profile) throw { status: 404, message: 'Applicant not found or already processed.' };
+    if (profile.app_status && profile.app_status !== 'Pending') {
+      throw { status: 409, message: 'Applicant has already been processed.' };
+    }
 
     const [sections] = await conn.execute(
       `SELECT s.*, COUNT(e.enrollment_id) AS enrolled_count
@@ -38,8 +46,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
     ) as any;
     const section = (sections as any[])[0];
     if (!section) throw { status: 404, message: 'Section not found.' };
-    
-    // Prerequisite logic — check all offerings in this section
+
     const [offeringsPrereqs] = await conn.execute(
       `SELECT sub.code, sub.title FROM subject_offerings so
        JOIN subjects sub ON so.subject_id = sub.subject_id
@@ -49,10 +56,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
     if ((offeringsPrereqs as any[]).length > 0) {
       const first = (offeringsPrereqs as any[])[0];
-      throw { 
-        status: 403, 
-        message: `Prerequisite not met. This section contains advanced subjects like ${first.code} — ${first.title}.` 
-      };
+      throw { status: 403, message: `Prerequisite not met. This section contains advanced subjects like ${first.code} — ${first.title}.` };
     }
 
     if (Number(section.enrolled_count) >= section.capacity) {
@@ -68,10 +72,21 @@ export const POST = apiHandler(async (req: NextRequest) => {
       [userId, profile.personal_email, hashed]
     );
 
-    await conn.execute(
-      'UPDATE profiles SET user_id = ?, applicant_status = "Enrolled" WHERE profile_id = ?',
-      [userId, applicant_id]
-    );
+    // Link profile to new user
+    await conn.execute('UPDATE profiles SET user_id = ? WHERE profile_id = ?', [userId, applicant_id]);
+
+    // Update application status
+    if (profile.application_id) {
+      await conn.execute(
+        'UPDATE applications SET status = ?, resolved_at = NOW() WHERE application_id = ?',
+        ['Enrolled', profile.application_id]
+      );
+    } else {
+      await conn.execute(
+        'INSERT INTO applications (user_id, status, resolved_at) VALUES (?, ?, NOW())',
+        [userId, 'Enrolled']
+      );
+    }
 
     const today = new Date().toISOString().slice(0, 10);
     const [enrollment] = await conn.execute(
@@ -85,13 +100,11 @@ export const POST = apiHandler(async (req: NextRequest) => {
       [section_id]
     ) as any;
 
-    if (offerings.length > 0) {
-      for (const offering of offerings) {
-        await conn.execute(
-          'INSERT INTO grades (enrollment_id, offering_id) VALUES (?, ?)',
-          [enrollmentId, offering.offering_id]
-        );
-      }
+    for (const offering of offerings) {
+      await conn.execute(
+        'INSERT INTO grades (enrollment_id, offering_id) VALUES (?, ?)',
+        [enrollmentId, offering.offering_id]
+      );
     }
 
     return { userId, plain, profile, sectionData: section };
@@ -115,8 +128,8 @@ export const POST = apiHandler(async (req: NextRequest) => {
   );
 
   const subjects = offeringsList.map(o => o.title);
-
   const info = sectionInfo[0];
+
   sendEmail({
     to: { email: profile.personal_email, name: `${profile.first_name} ${profile.last_name}` },
     subject: 'AcadTrack — Enrollment Approved',

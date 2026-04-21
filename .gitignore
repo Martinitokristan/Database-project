@@ -43,3 +43,6 @@ next-env.d.ts
 # Custom ignored directories
 /database
 /docs
+/scratch
+
+

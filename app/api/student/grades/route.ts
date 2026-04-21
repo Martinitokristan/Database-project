@@ -6,13 +6,13 @@ export const GET = apiHandler(async (req: NextRequest) => {
   const payload = requireRole(req, ['student']);
 
   const grades = await query<any[]>(
-    `SELECT g.grade_id, g.prelim_grade, g.midterm_grade, g.final_grade, g.remarks, g.offering_id,
+    `SELECT g.grade_id, g.midterm_grade, g.final_grade, g.remarks, g.offering_id,
             e.enrollment_id, e.date_enrolled,
             sec.section_name,
             sub.code AS subject_code, sub.title AS subject_title, sub.credit_units, sub.subject_type,
             p.first_name AS instructor_first, p.last_name AS instructor_last,
             sem.school_year, sem.term,
-            ROUND((COALESCE(g.prelim_grade,0) + COALESCE(g.midterm_grade,0) + COALESCE(g.final_grade,0)) / 3, 2) AS average
+            ROUND((COALESCE(g.midterm_grade,0) + COALESCE(g.final_grade,0)) / 2, 2) AS average
      FROM grades g
      JOIN enrollments e ON g.enrollment_id = e.enrollment_id
      JOIN subject_offerings so ON g.offering_id = so.offering_id

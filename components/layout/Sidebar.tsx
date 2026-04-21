@@ -69,6 +69,7 @@ const facultyGroups: NavGroup[] = [
     items: [
       { label: 'Home', href: '/home', icon: Home },
       { label: 'Sections', href: '/sections', icon: Layers },
+      { label: 'Grade Manager', href: '/grade-manager', icon: Star },
       { label: 'Assessments', href: '/assessments', icon: ClipboardCheck },
       { label: 'Attendance', href: '/attendance', icon: CalendarCheck },
       { label: 'Semesters', href: '/semesters', icon: CalendarRange },

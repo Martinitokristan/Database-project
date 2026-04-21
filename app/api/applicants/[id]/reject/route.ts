@@ -7,7 +7,10 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   const { id } = await ctx.params;
 
   const profiles = await query<any[]>(
-    'SELECT * FROM profiles WHERE profile_id = ? AND applicant_status IS NOT NULL',
+    `SELECT p.profile_id, app.application_id, app.status AS app_status
+     FROM profiles p
+     LEFT JOIN applications app ON app.user_id = p.user_id
+     WHERE p.profile_id = ?`,
     [id]
   );
 
@@ -15,13 +18,13 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
     return json({ success: false, message: 'Applicant not found.' }, 404);
   }
 
-  if (profiles[0].applicant_status !== 'Pending') {
+  if (profiles[0].app_status !== 'Pending') {
     return json({ success: false, message: 'Only pending applicants can be rejected.' }, 409);
   }
 
   await query(
-    'UPDATE profiles SET applicant_status = "Rejected" WHERE profile_id = ?',
-    [id]
+    'UPDATE applications SET status = ?, resolved_at = NOW() WHERE application_id = ?',
+    ['Rejected', profiles[0].application_id]
   );
 
   return json({ success: true, message: 'Applicant rejected.' });

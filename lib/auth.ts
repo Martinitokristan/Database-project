@@ -63,7 +63,8 @@ export function computeRemarks(
   midterm: number | null,
   final: number | null
 ): 'Passed' | 'Failed' | 'Incomplete' {
-  if (prelim === null || midterm === null || final === null) return 'Incomplete';
-  const avg = (prelim + midterm + final) / 3;
+  // Average is based on midterm and final only
+  if (midterm === null || final === null) return 'Incomplete';
+  const avg = (midterm + final) / 2;
   return avg <= 3.0 ? 'Passed' : 'Failed';
 }

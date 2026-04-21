@@ -5,8 +5,6 @@ import { z } from 'zod';
 
 const AttendanceSchema = z.object({
   enrollment_id: z.number().int(),
-  section_id:    z.number().int(),
-  user_id:       z.string(),
   date:          z.string(),
   status:        z.enum(['Present', 'Late', 'Absent']),
 });
@@ -18,19 +16,18 @@ const BulkAttendanceSchema = z.object({
 });
 
 export const GET = apiHandler(async (req: NextRequest) => {
-  const payload = getTokenPayload(req);
   requireRole(req, ['admin', 'faculty']);
 
   const { searchParams } = req.nextUrl;
   const sectionId = searchParams.get('section_id');
-  const month = searchParams.get('month'); // 1-12
-  const year = searchParams.get('year');
+  const month = searchParams.get('month');
+  const year  = searchParams.get('year');
 
   if (!sectionId || !month || !year) {
     return json({ success: false, message: 'Missing parameters.' }, 400);
   }
 
-  // 1. Get all students in the section
+  // Get all students in the section (via enrollments — no redundancy)
   const enrollments = await query<any[]>(
     `SELECT e.enrollment_id, e.user_id, p.first_name, p.last_name
      FROM enrollments e
@@ -40,14 +37,15 @@ export const GET = apiHandler(async (req: NextRequest) => {
     [sectionId]
   );
 
-  // 2. Get attendance records for the month
+  // Get attendance records — join to enrollment to get user_id/section_id without storing them
   const records = await query<any[]>(
-    `SELECT * FROM attendance
-     WHERE section_id = ? AND MONTH(date) = ? AND YEAR(date) = ?`,
+    `SELECT a.*, e.user_id, e.section_id
+     FROM attendance a
+     JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+     WHERE e.section_id = ? AND MONTH(a.date) = ? AND YEAR(a.date) = ?`,
     [sectionId, month, year]
   );
 
-  // 3. Compute Summary
   const uniqueDates = new Set(records.map(r => {
     const d = new Date(r.date);
     return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
@@ -59,10 +57,8 @@ export const GET = apiHandler(async (req: NextRequest) => {
     const present = studentRecords.filter(r => r.status === 'Present').length;
     const late    = studentRecords.filter(r => r.status === 'Late').length;
     const absent  = studentRecords.filter(r => r.status === 'Absent').length;
-    
-    // Calculate percentage based on total meetings in the month so far
-    const percent = totalMeetings > 0 
-      ? Math.round(((present + (late * 0.5)) / totalMeetings) * 100) 
+    const percent = totalMeetings > 0
+      ? Math.round(((present + (late * 0.5)) / totalMeetings) * 100)
       : 0;
 
     return {
@@ -89,7 +85,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
   const body = await req.json();
 
-  // If bulk
+  // Bulk update
   if (body.bulk) {
     const parsed = BulkAttendanceSchema.safeParse(body);
     if (!parsed.success) return json({ success: false, message: 'Validation failed.' }, 422);
@@ -97,29 +93,31 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
     const count = await transaction(async (conn) => {
       if (status === 'Clear') {
+        // Delete via JOIN since no section_id stored in attendance
         const [res] = await conn.execute(
-          'DELETE FROM attendance WHERE section_id = ? AND date = ?',
+          `DELETE a FROM attendance a
+           JOIN enrollments e ON a.enrollment_id = e.enrollment_id
+           WHERE e.section_id = ? AND a.date = ?`,
           [section_id, date]
         );
         return (res as any).affectedRows;
       }
 
-      // Get all students
       const [rows] = await conn.execute(
-        "SELECT enrollment_id, user_id FROM enrollments WHERE section_id = ? AND status = 'Enrolled'",
+        "SELECT enrollment_id FROM enrollments WHERE section_id = ? AND status = 'Enrolled'",
         [section_id]
       );
-      const students = rows as any[];
-      
-      for (const s of students) {
+      const enrollments = rows as any[];
+
+      for (const s of enrollments) {
         await conn.execute(
-          `INSERT INTO attendance (enrollment_id, section_id, user_id, date, status, marked_by)
-           VALUES (?, ?, ?, ?, ?, ?)
+          `INSERT INTO attendance (enrollment_id, user_id, section_id, date, status, marked_by)
+           VALUES (?, (SELECT user_id FROM enrollments WHERE enrollment_id = ?), ?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE status = ?, marked_by = ?`,
-          [s.enrollment_id, section_id, s.user_id, date, status, payload.user_id, status, payload.user_id]
+          [s.enrollment_id, s.enrollment_id, section_id, date, status, payload.user_id, status, payload.user_id]
         );
       }
-      return students.length;
+      return enrollments.length;
     });
 
     return json({ success: true, message: `Updated ${count} records.`, data: { count } });
@@ -129,13 +127,13 @@ export const POST = apiHandler(async (req: NextRequest) => {
   const parsed = AttendanceSchema.safeParse(body);
   if (!parsed.success) return json({ success: false, message: 'Validation failed.' }, 422);
 
-  const { enrollment_id, section_id, user_id, date, status } = parsed.data;
+  const { enrollment_id, date, status } = parsed.data;
 
   await query(
-    `INSERT INTO attendance (enrollment_id, section_id, user_id, date, status, marked_by)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO attendance (enrollment_id, user_id, section_id, date, status, marked_by)
+     VALUES (?, (SELECT user_id FROM enrollments WHERE enrollment_id = ?), (SELECT section_id FROM enrollments WHERE enrollment_id = ?), ?, ?, ?)
      ON DUPLICATE KEY UPDATE status = ?, marked_by = ?`,
-    [enrollment_id, section_id, user_id, date, status, payload.user_id, status, payload.user_id]
+    [enrollment_id, enrollment_id, enrollment_id, date, status, payload.user_id, status, payload.user_id]
   );
 
   return json({ success: true, message: 'Attendance saved.' });
