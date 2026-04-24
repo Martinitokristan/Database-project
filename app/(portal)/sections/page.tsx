@@ -21,7 +21,7 @@ import { sectionService } from '@/services/sectionService';
 import { subjectService } from '@/services/subjectService';
 import { semesterService } from '@/services/semesterService';
 import { toast } from 'sonner';
-import { BookOpen, X, Pencil, Mail, Calendar, Clock, MapPin, Users, Loader2 } from 'lucide-react';
+import { BookOpen, X, Pencil, Mail, Calendar, Clock, MapPin, Users, Loader2, Plus, ChevronDown, ChevronRight, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
@@ -363,14 +363,17 @@ function FacultySections() {
       .then(res => res.json())
       .then(r => {
         if (r.success) {
-          // Sort AM to PM
-          const sorted = (r.data ?? []).sort((a: any, b: any) => {
-            const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-            const dayDiff = days.indexOf(a.day_of_week) - days.indexOf(b.day_of_week);
-            if (dayDiff !== 0) return dayDiff;
-            return a.start_time.localeCompare(b.start_time);
+          const raw = r.data ?? [];
+          const grouped = raw.reduce((acc: any, curr: any) => {
+            const key = curr.offering_id;
+            if (!acc[key]) acc[key] = { ...curr, scheduleList: [] };
+            acc[key].scheduleList.push(curr);
+            return acc;
+          }, {});
+          const sorted = Object.values(grouped).sort((a: any, b: any) => {
+            return a.subject_title.localeCompare(b.subject_title);
           });
-          setSchedules(sorted);
+          setSchedules(sorted as any[]);
         }
         setLoading(false);
       });
@@ -413,16 +416,22 @@ function FacultySections() {
           <CardContent className="p-0">
             <Accordion type="single" collapsible className="w-full">
               {schedules.map((s) => (
-                <AccordionItem key={s.schedule_id} value={String(s.schedule_id)} className="border-b px-6 last:border-0 hover:bg-slate-50/50 transition-colors">
+                <AccordionItem key={s.offering_id} value={String(s.offering_id)} className="border-b px-6 last:border-0 hover:bg-slate-50/50 transition-colors">
                   <AccordionTrigger className="hover:no-underline py-6">
                     <div className="flex flex-col md:flex-row md:items-center gap-4 text-left w-full">
-                      <div className="flex items-center gap-3 min-w-[140px]">
-                        <Calendar className="h-4 w-4 text-primary" />
-                        <span className="font-bold text-sm">{s.day_of_week}</span>
-                      </div>
-                      <div className="flex items-center gap-3 min-w-[180px]">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">{formatTime(s.start_time)} - {formatTime(s.end_time)}</span>
+                      <div className="flex flex-col gap-2 min-w-[320px]">
+                        {s.scheduleList.map((sch: any) => (
+                          <div key={sch.schedule_id} className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 min-w-[120px]">
+                              <Calendar className="h-4 w-4 text-primary" />
+                              <span className="font-bold text-sm">{sch.day_of_week}</span>
+                            </div>
+                            <div className="flex items-center gap-2 min-w-[160px]">
+                              <Clock className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm font-medium">{formatTime(sch.start_time)} - {formatTime(sch.end_time)}</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                       <div className="flex-1">
                         <span className="font-bold text-slate-900">{s.subject_title}</span>
@@ -446,10 +455,12 @@ function FacultySections() {
                             </Link>
                           </div>
                           <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-sm text-slate-600">
-                              <MapPin className="h-4 w-4" /> Room {s.room}
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-slate-600">
+                            {s.scheduleList.map((sch: any) => (
+                              <div key={sch.schedule_id} className="flex items-center gap-2 text-sm text-slate-600">
+                                <MapPin className="h-4 w-4" /> Room {sch.room} <span className="text-xs text-muted-foreground">({sch.day_of_week})</span>
+                              </div>
+                            ))}
+                            <div className="flex items-center gap-2 text-sm text-slate-600 mt-2">
                               <Users className="h-4 w-4" /> Instructor: {s.instructor_last || 'TBA'}
                             </div>
                           </div>

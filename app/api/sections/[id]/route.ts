@@ -27,7 +27,8 @@ export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
      JOIN semesters sem ON sec.semester_id = sem.semester_id
      LEFT JOIN enrollments e ON e.section_id = sec.section_id AND e.status = 'Enrolled'
      WHERE sec.section_id = ?
-     GROUP BY sec.section_id`,
+     GROUP BY sec.section_id, sem.school_year, sem.term, sem.status,
+              sec.section_name, sec.semester_id, sec.year_level_id, sec.capacity, sec.is_archived, sec.created_at`,
     [id]
   );
 
@@ -71,9 +72,20 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   const existing = await query<any[]>('SELECT section_id FROM sections WHERE section_id = ?', [id]);
   if (existing.length === 0) return json({ success: false, message: 'Section not found.' }, 404);
 
-  const fields = parsed.data;
-  const setClauses = Object.keys(fields).map(k => `${k} = ?`).join(', ');
-  const values     = Object.values(fields);
+  const { year_level, ...otherFields } = parsed.data;
+  const updateData: Record<string, any> = { ...otherFields };
+
+  if (year_level !== undefined) {
+    if (year_level === null) {
+      updateData.year_level_id = null;
+    } else {
+      const ylRes = await query<any[]>('SELECT year_level_id FROM year_levels WHERE level_name = ?', [year_level]);
+      if (ylRes.length > 0) updateData.year_level_id = ylRes[0].year_level_id;
+    }
+  }
+
+  const setClauses = Object.keys(updateData).map(k => `${k} = ?`).join(', ');
+  const values     = Object.values(updateData);
   if (!setClauses) return json({ success: false, message: 'No fields to update.' }, 422);
 
   await query(`UPDATE sections SET ${setClauses} WHERE section_id = ?`, [...values, id]);

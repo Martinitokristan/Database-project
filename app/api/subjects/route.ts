@@ -52,9 +52,16 @@ export const POST = apiHandler(async (req: NextRequest) => {
   const existing = await query<any[]>('SELECT subject_id FROM subjects WHERE code = ?', [code]);
   if (existing.length > 0) return json({ success: false, message: 'Subject code already exists.' }, 409);
 
+  // Resolve year_level_id
+  let ylId = null;
+  if (year_level) {
+    const ylRes = await query<any[]>('SELECT year_level_id FROM year_levels WHERE level_name = ?', [year_level]);
+    if (ylRes.length > 0) ylId = ylRes[0].year_level_id;
+  }
+
   const result: any = await query(
-    'INSERT INTO subjects (course_id, code, title, credit_units, year_level, subject_type, prerequisite_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [course_id, code, title, credit_units, year_level || null, subject_type, prerequisite_id || null]
+    'INSERT INTO subjects (course_id, code, title, credit_units, year_level_id, subject_type, prerequisite_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [course_id, code, title, credit_units, ylId, subject_type, prerequisite_id || null]
   );
   return json({ success: true, data: { subject_id: result.insertId }, message: 'Subject created.' }, 201);
 });

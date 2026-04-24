@@ -18,6 +18,7 @@ import { gradeService } from '@/services/gradeService';
 import { toast } from 'sonner';
 import { Save, CheckCircle2, Lock, Users, BookOpen, Star, Loader2, ClipboardList, PenTool } from 'lucide-react';
 import { ClassRecordTab } from './ClassRecordTab';
+import { percentToGrade } from '@/lib/auth';
 
 export default function GradeManagerPage() {
   const { role, isLoading } = useAuth();
@@ -78,19 +79,24 @@ function GradeManager() {
 
   function computeAverage(midterm: number | null, final_val: number | null): string {
     if (midterm == null && final_val == null) return '—';
-    const m = Number(midterm) || 0;
-    const f = Number(final_val) || 0;
-    let count = 0, sum = 0;
-    if (midterm != null) { sum += m; count++; }
-    if (final_val != null) { sum += f; count++; }
-    return count > 0 ? (sum / count).toFixed(2) : '—';
+    const avg = (midterm !== null && final_val !== null)
+      ? (Number(midterm) + Number(final_val)) / 2
+      : (Number(midterm ?? final_val ?? 0));
+    
+    return percentToGrade(avg);
   }
 
   function computeRemarks(midterm: number | null, final_val: number | null): string | null {
-    if (midterm == null || final_val == null) return null;
-    const avg = (Number(midterm) + Number(final_val)) / 2;
-    return avg <= 3.0 ? 'Passed' : 'Failed';
+    if (midterm == null && final_val == null) return null;
+    const avg = (midterm !== null && final_val !== null)
+      ? (Number(midterm) + Number(final_val)) / 2
+      : (Number(midterm ?? final_val ?? 0));
+    
+    const grade = parseFloat(percentToGrade(avg));
+    return grade <= 3.0 ? 'Passed' : 'Failed';
   }
+
+
 
   async function handleSaveGrade(g: any) {
     const enrollmentId = g.enrollment_id;
@@ -303,7 +309,7 @@ function GradeManager() {
                                 <span className="font-medium">{g.prelim_grade ?? '—'}</span>
                               ) : (
                                 <Input
-                                  type="number" step="0.01" min="1" max="5" placeholder="—"
+                                  type="number" step="0.01" min="0" max="100" placeholder="0-100"
                                   className="h-9 w-20 mx-auto text-center font-medium text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   value={preVal ?? ''} onChange={e => handleGradeInput(g.enrollment_id, 'prelim', e.target.value)}
                                 />
@@ -315,7 +321,7 @@ function GradeManager() {
                                 <span className="font-medium">{g.midterm_grade ?? '—'}</span>
                               ) : (
                                 <Input
-                                  type="number" step="0.01" min="1" max="5" placeholder="—"
+                                  type="number" step="0.01" min="0" max="100" placeholder="0-100"
                                   className="h-9 w-20 mx-auto text-center font-medium text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   value={midVal ?? ''} onChange={e => handleGradeInput(g.enrollment_id, 'midterm', e.target.value)}
                                 />
@@ -327,7 +333,7 @@ function GradeManager() {
                                 <span className="font-medium">{g.semi_final_grade ?? '—'}</span>
                               ) : (
                                 <Input
-                                  type="number" step="0.01" min="1" max="5" placeholder="—"
+                                  type="number" step="0.01" min="0" max="100" placeholder="0-100"
                                   className="h-9 w-20 mx-auto text-center font-medium text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   value={semiVal ?? ''} onChange={e => handleGradeInput(g.enrollment_id, 'semi_final', e.target.value)}
                                 />
@@ -347,9 +353,18 @@ function GradeManager() {
                             </TableCell>
 
                             <TableCell className="text-center bg-muted/10">
-                              <span className="font-black text-lg tracking-tight">
-                                {avg}
-                              </span>
+                              <div className="flex flex-col items-center">
+                                {(() => {
+                                  if (avg === '—') return <span className="text-muted-foreground">—</span>;
+                                  const gradeVal = parseFloat(avg);
+                                  const colorClass = gradeVal <= 1.5 ? 'text-emerald-600' : (gradeVal <= 3.0 ? 'text-indigo-600' : 'text-red-600');
+                                  return (
+                                    <span className={`font-black text-2xl tracking-tight ${colorClass}`}>
+                                      {avg}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
                             </TableCell>
                             <TableCell className="text-center">
                               {remarks ? (
@@ -373,7 +388,7 @@ function GradeManager() {
                                 >
                                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                                 </Button>
-                              ) : g.midterm_grade != null && g.final_grade != null ? (
+                              ) : g.midterm_grade != null ? (
                                 <CheckCircle2 className="h-4 w-4 text-emerald-500 mx-auto" />
                               ) : null}
                             </TableCell>

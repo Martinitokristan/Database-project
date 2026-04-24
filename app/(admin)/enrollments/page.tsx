@@ -18,7 +18,7 @@ import { enrollmentService } from '@/services/enrollmentService';
 import { sectionService } from '@/services/sectionService';
 import { Applicant, Section } from '@/types';
 import { toast } from 'sonner';
-import { CheckCircle2, XCircle, Loader2, Search, Download } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, Search, Download, Eye } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { reports } from '@/lib/reports';
 import { Badge } from '@/components/ui/badge';
@@ -75,12 +75,12 @@ export default function EnrollmentsPage() {
 
   return (
     <div>
-      <PageHeader title="Enrollments" description="Manage pending applicants and enrollments." />
+      <PageHeader title="Enrollments" description="Manage pending enrollees and enrollments." />
 
       <Tabs defaultValue="pending">
         <TabsList className="mb-4">
           <TabsTrigger value="pending">Pending ({pending.length})</TabsTrigger>
-          <TabsTrigger value="enrolled">All Applicants</TabsTrigger>
+          <TabsTrigger value="enrolled">All Enrollees</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pending">
@@ -89,7 +89,7 @@ export default function EnrollmentsPage() {
               <div className="relative mb-6">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
-                  placeholder="Search pending applicants..." 
+                  placeholder="Search pending enrollees..." 
                   className="pl-10" 
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -97,7 +97,7 @@ export default function EnrollmentsPage() {
               </div>
               
               {loading ? <LoadingSpinner /> : filteredPending.length === 0 ? (
-                <EmptyState title="No applicants found" description={search ? "Adjust your search terms and try again." : "All applicants have been processed."} />
+                <EmptyState title="No enrollees found" description={search ? "Adjust your search terms and try again." : "All enrollees have been processed."} />
               ) : (
                 <Table>
                   <TableHeader>
@@ -118,11 +118,8 @@ export default function EnrollmentsPage() {
                         <TableCell className="text-sm text-muted-foreground">{a.applied_at ? new Date(a.applied_at).toLocaleDateString() : '—'}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button size="sm" onClick={() => { setVerifyTarget(a); setSelectedSection(''); }}>
-                              <CheckCircle2 className="mr-1 h-4 w-4" />Enroll
-                            </Button>
-                            <Button size="sm" variant="destructive" onClick={() => setRejectTarget(a)}>
-                              <XCircle className="mr-1 h-4 w-4" />Reject
+                            <Button size="icon" variant="ghost" onClick={() => { setVerifyTarget(a); setSelectedSection(''); }}>
+                              <Eye className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
@@ -136,54 +133,133 @@ export default function EnrollmentsPage() {
         </TabsContent>
 
         <TabsContent value="enrolled">
-          <AllApplicants searchProp={search} onSearchChange={setSearch} />
+          <AllEnrollees searchProp={search} onSearchChange={setSearch} />
         </TabsContent>
       </Tabs>
 
       <Dialog open={!!verifyTarget} onOpenChange={o => !o && setVerifyTarget(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Enroll Applicant</DialogTitle></DialogHeader>
-          {verifyTarget && (
-            <div className="space-y-4">
-              <div className="rounded-md bg-muted p-3 text-sm">
-                <p className="font-medium">{verifyTarget.first_name} {verifyTarget.last_name}</p>
-                <p className="text-muted-foreground">{verifyTarget.email} · {verifyTarget.course_name}</p>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Assign to Section</Label>
-                <Select value={selectedSection} onValueChange={setSelectedSection}>
-                  <SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger>
-                  <SelectContent>
-                    {sections.map((s: any) => (
-                      <SelectItem key={s.section_id} value={String(s.section_id)}>
-                        {s.section_name} · {s.subject_code} · {s.enrolled_count}/{s.capacity}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Review Application</DialogTitle></DialogHeader>
+          {verifyTarget && (() => {
+            let address: any = verifyTarget.address || {};
+            let isStringAddress = false;
+            if (typeof verifyTarget.address === 'string') {
+              try {
+                address = JSON.parse(verifyTarget.address);
+              } catch (e) {
+                address = verifyTarget.address;
+                isStringAddress = true;
+              }
+            }
+            
+            return (
+            <div className="space-y-6 py-2">
+              <fieldset className="space-y-4">
+                <legend className="text-sm font-semibold text-primary uppercase tracking-wider border-b pb-2 w-full">Personal Information</legend>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground block mb-1">Full Name</span>
+                    <span className="font-medium">{verifyTarget.last_name}, {verifyTarget.first_name} {verifyTarget.middle_name} {verifyTarget.suffix}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block mb-1">Gender</span>
+                    <span className="font-medium">{verifyTarget.gender}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block mb-1">Date of Birth</span>
+                    <span className="font-medium">{verifyTarget.date_of_birth ? new Date(verifyTarget.date_of_birth).toLocaleDateString() : '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block mb-1">Phone</span>
+                    <span className="font-medium">{verifyTarget.phone}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block mb-1">Email</span>
+                    <span className="font-medium">{verifyTarget.email}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block mb-1">Course</span>
+                    <span className="font-medium">{verifyTarget.course_name}</span>
+                  </div>
+                </div>
+              </fieldset>
+
+              <fieldset className="space-y-4">
+                <legend className="text-sm font-semibold text-primary uppercase tracking-wider border-b pb-2 w-full">Address Details</legend>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                  {isStringAddress ? (
+                    <div className="bg-muted/30 p-3 rounded-md border col-span-1 sm:col-span-2">
+                      <div className="font-medium mb-1 flex items-center gap-2">Home / Current Address</div>
+                      <div className="text-muted-foreground">{address}</div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="bg-muted/30 p-3 rounded-md border">
+                        <div className="font-medium mb-1 flex items-center gap-2">Current Address</div>
+                        <div className="text-muted-foreground">
+                          {address?.current?.streetBarangay}, {address?.current?.city}<br/>
+                          {address?.current?.province}, {address?.current?.postalCode}
+                        </div>
+                      </div>
+                      {address?.home && address.home.province && (
+                      <div className="bg-muted/30 p-3 rounded-md border">
+                        <div className="font-medium mb-1 flex items-center gap-2">Home Address</div>
+                        <div className="text-muted-foreground">
+                          {address.home.streetBarangay}, {address.home.city}<br/>
+                          {address.home.province}, {address.home.postalCode}
+                        </div>
+                      </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </fieldset>
+
+              <fieldset className="space-y-4">
+                <legend className="text-sm font-semibold text-primary uppercase tracking-wider border-b pb-2 w-full">Enrollment Action</legend>
+                <div className="space-y-1.5">
+                  <Label>Assign to Section <span className="text-destructive">*</span></Label>
+                  <Select value={selectedSection} onValueChange={setSelectedSection}>
+                    <SelectTrigger><SelectValue placeholder="Select section to enroll" /></SelectTrigger>
+                    <SelectContent>
+                      {sections.map((s: any) => (
+                        <SelectItem key={s.section_id} value={String(s.section_id)}>
+                          {s.section_name} · {s.subject_code} · {s.enrolled_count}/{s.capacity}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </fieldset>
             </div>
-          )}
-          <DialogFooter>
+            );
+          })()}
+          <DialogFooter className="gap-2 sm:gap-0 mt-4 border-t pt-4">
             <Button variant="outline" onClick={() => setVerifyTarget(null)}>Cancel</Button>
-            <Button onClick={handleVerify} disabled={verifying || !selectedSection}>
-              {verifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirm Enrollment
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="destructive" onClick={() => { const t = verifyTarget; setVerifyTarget(null); setRejectTarget(t); }}>
+                <XCircle className="mr-1 h-4 w-4" /> Reject Application
+              </Button>
+              <Button onClick={handleVerify} disabled={verifying || !selectedSection}>
+                {verifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <CheckCircle2 className="mr-1 h-4 w-4" /> Accept & Enroll
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <ConfirmDialog
         open={!!rejectTarget} onOpenChange={o => !o && setRejectTarget(null)}
-        title="Reject Applicant?"
-        description={`Reject ${rejectTarget?.first_name} ${rejectTarget?.last_name}'s application? This cannot be undone.`}
+        title="Reject Enrollee?"
+        description={`Reject ${rejectTarget?.first_name} ${rejectTarget?.last_name}'s enrollment? This cannot be undone.`}
         onConfirm={handleReject} loading={rejecting} confirmLabel="Reject"
       />
     </div>
   );
 }
 
-function AllApplicants({ searchProp, onSearchChange }: { searchProp: string, onSearchChange: (v: string) => void }) {
+function AllEnrollees({ searchProp, onSearchChange }: { searchProp: string, onSearchChange: (v: string) => void }) {
   const [applicants, setApplicants] = useState<any[]>([]);
   const [loading, setLoading]       = useState(true);
 
@@ -206,14 +282,14 @@ function AllApplicants({ searchProp, onSearchChange }: { searchProp: string, onS
         <div className="relative mb-6">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search all applicants..." 
+            placeholder="Search all enrollees..." 
             className="pl-10" 
             value={searchProp}
             onChange={(e) => onSearchChange(e.target.value)}
           />
         </div>
 
-        {filtered.length === 0 ? <EmptyState title="No results found" description="No matching applicants in the system." /> : (
+        {filtered.length === 0 ? <EmptyState title="No results found" description="No matching enrollees in the system." /> : (
           <Table>
             <TableHeader>
               <TableRow>

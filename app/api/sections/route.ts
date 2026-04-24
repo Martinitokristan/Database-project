@@ -44,7 +44,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
   const limit = limitParam ? `LIMIT ${parseInt(limitParam, 10)}` : '';
 
   const sections = await query<any[]>(
-    `SELECT sec.*,
+    `SELECT sec.*, yl.level_name AS year_level,
             sem.school_year, sem.term, sem.status AS semester_status,
             COUNT(DISTINCT e.enrollment_id) AS enrolled_count,
             (SELECT GROUP_CONCAT(sub.code SEPARATOR ', ')
@@ -53,9 +53,11 @@ export const GET = apiHandler(async (req: NextRequest) => {
              WHERE so.section_id = sec.section_id) as subject_codes
      FROM sections sec
      JOIN semesters sem ON sec.semester_id = sem.semester_id
+     LEFT JOIN year_levels yl ON sec.year_level_id = yl.year_level_id
      LEFT JOIN enrollments e ON e.section_id = sec.section_id AND e.status = 'Enrolled'
      ${where}
-     GROUP BY sec.section_id
+     GROUP BY sec.section_id, yl.level_name, sem.school_year, sem.term, sem.status,
+              sec.section_name, sec.semester_id, sec.year_level_id, sec.capacity, sec.is_archived, sec.created_at
      ORDER BY sem.school_year DESC, sec.section_name
      ${limit}`,
     params
@@ -76,10 +78,17 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
   // Use a transaction for atomic creation of section + offering
   const result = await transaction(async (conn) => {
-    // 1. Create the section shell
+    // 1. Resolve year_level_id if provided
+    let yearLevelId = null;
+    if (year_level) {
+      const [ylRows] = await conn.execute('SELECT year_level_id FROM year_levels WHERE level_name = ?', [year_level]) as any;
+      if (ylRows.length > 0) yearLevelId = ylRows[0].year_level_id;
+    }
+
+    // 2. Create the section shell
     const [secRes] = await conn.execute(
-      'INSERT INTO sections (semester_id, section_name, year_level, capacity) VALUES (?, ?, ?, ?)',
-      [semester_id, section_name, year_level || null, capacity]
+      'INSERT INTO sections (semester_id, section_name, year_level_id, capacity) VALUES (?, ?, ?, ?)',
+      [semester_id, section_name, yearLevelId, capacity]
     ) as any;
     const newSectionId = secRes.insertId;
 

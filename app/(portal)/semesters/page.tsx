@@ -108,6 +108,8 @@ function AdminSemestersView() {
   const [subjects, setSubjects]             = useState<any[]>([]);
   const [faculty, setFaculty]               = useState<any[]>([]);
   const [notifyDone, setNotifyDone]     = useState<{ sent: number; faculty: string[] } | null>(null);
+  const [renamingSection, setRenamingSection] = useState(false);
+  const [renameValue, setRenameValue]         = useState('');
 
   const { register, handleSubmit, setValue, reset, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -164,7 +166,7 @@ function AdminSemestersView() {
       const json = await res.json();
       if (!json.success) { toast.error(json.message); return; }
       setNotifyDone(json.data);
-      toast.success(json.message);
+      toast.success(`${json.data.type} notification sent successfully to ${json.data.sent} faculty.`);
     } finally { setNotifying(false); }
   }
 
@@ -409,8 +411,43 @@ function AdminSemestersView() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <Label className="text-muted-foreground">Section Name</Label>
-                  <p className="font-bold text-lg">{viewSectionTarget.section_name}</p>
+                  <Label className="text-muted-foreground flex items-center gap-1">
+                    Section Name
+                    <Button 
+                      variant="ghost" size="icon" className="h-4 w-4 text-slate-400 hover:text-indigo-600"
+                      onClick={() => {
+                        setRenameValue(viewSectionTarget.section_name);
+                        setRenamingSection(true);
+                      }}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                  </Label>
+                  {renamingSection ? (
+                    <div className="flex items-center gap-2 mt-1">
+                      <Input 
+                        value={renameValue} 
+                        onChange={e => setRenameValue(e.target.value)}
+                        className="h-8 text-sm font-bold"
+                        autoFocus
+                      />
+                      <Button size="sm" className="h-8" onClick={async () => {
+                        if (!renameValue.trim()) return;
+                        setSaving(true);
+                        const res = await sectionService.update(viewSectionTarget.section_id, { section_name: renameValue.trim() });
+                        setSaving(false);
+                        if (res.success) {
+                          toast.success('Section renamed.');
+                          setRenamingSection(false);
+                          setViewSectionTarget({ ...viewSectionTarget, section_name: renameValue.trim() });
+                          load();
+                        } else toast.error(res.message);
+                      }}>Save</Button>
+                      <Button size="sm" variant="ghost" className="h-8" onClick={() => setRenamingSection(false)}>Cancel</Button>
+                    </div>
+                  ) : (
+                    <p className="font-bold text-lg">{viewSectionTarget.section_name}</p>
+                  )}
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Status</Label>
@@ -610,7 +647,7 @@ function AdminSemestersView() {
                     onClick={() => setNotifyType('final')}
                     disabled={!notifyTarget?.final_deadline}
                   >
-                    Final {notifyTarget?.final_deadline ? `( ${notifyTarget.final_deadline.slice(0,10)} )` : '(not set)'}
+                    Finals {notifyTarget?.final_deadline ? `( ${notifyTarget.final_deadline.slice(0,10)} )` : '(not set)'}
                   </Button>
                 </div>
               </div>
@@ -624,7 +661,7 @@ function AdminSemestersView() {
                   disabled={notifying || (notifyType === 'midterm' ? !notifyTarget?.midterm_deadline : !notifyTarget?.final_deadline)}
                 >
                   {notifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Send {notifyType === 'midterm' ? 'Midterm' : 'Final'} Notification
+                  Notify Faculty for {notifyType === 'midterm' ? 'Midterm' : 'Finals'}
                 </Button>
               </DialogFooter>
             </div>

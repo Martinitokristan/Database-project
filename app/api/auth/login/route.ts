@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import pool from '@/lib/db';
+import { query } from '@/lib/db';
 import { comparePassword, signToken } from '@/lib/auth';
 import { apiHandler, json } from '@/lib/middleware';
 import { cookies } from 'next/headers';
@@ -18,12 +18,12 @@ export const POST = apiHandler(async (req: NextRequest) => {
   }
   const { email, password } = parsed.data;
 
-  const [users] = await pool.execute(
+  const users = await query<any[]>(
     `SELECT u.*, r.role_name FROM users u
      JOIN roles r ON u.role_id = r.role_id
      WHERE u.email = ? LIMIT 1`,
     [email]
-  ) as any;
+  );
 
   const user = (users as any[])[0];
   if (!user) return json({ success: false, message: 'Invalid email or password.' }, 401);

@@ -17,21 +17,22 @@ export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
             sec.section_name, sec.capacity, sec.semester_id, sec.is_archived,
             sem.school_year, sem.term, sem.status AS semester_status,
             p.first_name AS instructor_first, p.last_name AS instructor_last,
-            COUNT(DISTINCT e.enrollment_id) AS enrolled_count
+            (SELECT COUNT(DISTINCT e.enrollment_id)
+             FROM enrollments e
+             WHERE e.section_id = sec.section_id AND e.status = 'Enrolled') AS enrolled_count
      FROM subject_offerings so
      JOIN subjects sub ON so.subject_id = sub.subject_id
      JOIN sections sec ON so.section_id = sec.section_id
      JOIN semesters sem ON sec.semester_id = sem.semester_id
-     JOIN users u ON so.instructor_id = u.user_id
+     LEFT JOIN users u ON so.instructor_id = u.user_id
      LEFT JOIN profiles p ON p.user_id = u.user_id
-     LEFT JOIN enrollments e ON e.section_id = sec.section_id AND e.status = 'Enrolled'
-     WHERE so.offering_id = ?
-     GROUP BY so.offering_id`,
+     WHERE so.offering_id = ?`,
     [id]
   );
 
   if (offerings.length === 0) return json({ success: false, message: 'Offering not found.' }, 404);
   return json({ success: true, data: offerings[0] });
+
 });
 
 export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
@@ -70,8 +71,7 @@ export const DELETE = apiHandler(async (req: NextRequest, ctx: { params: Promise
     // 2. Delete Attempts (linked via assessment)
     await query(`DELETE FROM assessment_attempts WHERE assessment_id IN (${placeholders})`, assessmentIds);
     
-    // 3. Delete Answers & Options (linked via questions)
-    await query(`DELETE FROM assessment_answers WHERE question_id IN (SELECT question_id FROM assessment_questions WHERE assessment_id IN (${placeholders}))`, assessmentIds);
+    // 3. Delete Options (linked via questions)
     await query(`DELETE FROM assessment_options WHERE question_id IN (SELECT question_id FROM assessment_questions WHERE assessment_id IN (${placeholders}))`, assessmentIds);
     
     // 4. Delete Questions (linked via assessment)

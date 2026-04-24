@@ -106,7 +106,7 @@ export default function LandingPage() {
               href="/apply"
               className="hidden sm:inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
             >
-              Apply
+              Enroll Now
             </Link>
             <Link
               href="/login"
@@ -146,7 +146,7 @@ export default function LandingPage() {
               className="inline-flex items-center gap-2 rounded-lg border px-6 py-3 text-sm font-semibold hover:bg-muted transition-colors"
             >
               <GraduationCap className="h-4 w-4" />
-              Apply for admission
+              Enroll Now
             </Link>
           </div>
         </div>
@@ -261,7 +261,7 @@ export default function LandingPage() {
               href="/apply"
               className="inline-flex items-center gap-2 rounded-lg border border-white/30 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
             >
-              Apply for admission
+              Enroll Now
             </Link>
           </div>
         </div>

@@ -32,9 +32,20 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
     if (codeCheck.length > 0) return json({ success: false, message: 'Subject code already in use.' }, 409);
   }
 
-  const fields = parsed.data;
-  const setClauses = Object.keys(fields).map(k => `${k} = ?`).join(', ');
-  const values     = Object.values(fields);
+  const { year_level, ...otherFields } = parsed.data;
+  const updateData: Record<string, any> = { ...otherFields };
+
+  if (year_level !== undefined) {
+    if (year_level === null) {
+      updateData.year_level_id = null;
+    } else {
+      const ylRes = await query<any[]>('SELECT year_level_id FROM year_levels WHERE level_name = ?', [year_level]);
+      if (ylRes.length > 0) updateData.year_level_id = ylRes[0].year_level_id;
+    }
+  }
+
+  const setClauses = Object.keys(updateData).map(k => `${k} = ?`).join(', ');
+  const values     = Object.values(updateData);
   if (!setClauses) return json({ success: false, message: 'No fields to update.' }, 422);
 
   await query(`UPDATE subjects SET ${setClauses} WHERE subject_id = ?`, [...values, id]);

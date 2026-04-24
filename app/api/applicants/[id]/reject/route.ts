@@ -7,9 +7,9 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   const { id } = await ctx.params;
 
   const profiles = await query<any[]>(
-    `SELECT p.profile_id, app.application_id, app.status AS app_status
+    `SELECT p.profile_id, app.application_id, app.applicant_status AS app_status
      FROM profiles p
-     LEFT JOIN applications app ON app.user_id = p.user_id
+     LEFT JOIN applications app ON app.profile_id = p.profile_id
      WHERE p.profile_id = ?`,
     [id]
   );
@@ -23,7 +23,7 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   }
 
   await query(
-    'UPDATE applications SET status = ?, resolved_at = NOW() WHERE application_id = ?',
+    'UPDATE applications SET applicant_status = ?, updated_at = NOW() WHERE application_id = ?',
     ['Rejected', profiles[0].application_id]
   );
 

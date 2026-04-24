@@ -19,7 +19,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
 
   const records = await query<any[]>(
     `SELECT cri.item_id, cri.offering_id, cri.record_type, cri.title, cri.max_score, cri.record_date,
-            crs.score, crs.remarks,
+            crs.score,
             sub.code AS subject_code, sub.title AS subject_title,
             sec.section_name,
             p.first_name AS instructor_first, p.last_name AS instructor_last

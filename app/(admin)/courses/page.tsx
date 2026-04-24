@@ -91,7 +91,7 @@ export default function CoursesPage() {
               <TableBody>
                 {courses.map(c => (
                   <TableRow key={c.course_id}>
-                    <TableCell className="font-medium">{c.course_name}</TableCell>
+                    <TableCell className="font-medium max-w-[300px] truncate" title={c.course_name}>{c.course_name}</TableCell>
                     <TableCell>{c.department_name}</TableCell>
                     <TableCell className="flex gap-1">
                       <Button size="sm" variant="ghost" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>

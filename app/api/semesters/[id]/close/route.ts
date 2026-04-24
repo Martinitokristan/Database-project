@@ -42,6 +42,13 @@ export const POST = apiHandler(async (req: NextRequest, ctx: { params: Promise<{
       [id]
     );
 
+    // Fetch year level mapping for quick lookup
+    const ylRows = await query<any[]>('SELECT year_level_id, level_name FROM year_levels');
+    const ylMap = Object.fromEntries(ylRows.map(r => [r.level_name, r.year_level_id]));
+    const ylReverseMap = Object.fromEntries(ylRows.map(r => [r.year_level_id, r.level_name]));
+
+    const YEAR_LEVEL_ORDER = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
+
     for (const { user_id } of students) {
       // 4 — Get all enrollments for this student in this semester
       const enrollments = await query<any[]>(
@@ -53,12 +60,18 @@ export const POST = apiHandler(async (req: NextRequest, ctx: { params: Promise<{
         [id, user_id]
       );
 
-      // 5 — Fetch current year level
-      const profileRows = await query<any[]>(
-        'SELECT year_level, academic_status FROM profiles WHERE user_id = ?',
-        [user_id]
+      // 5 — Fetch current year level and status
+      const statusRows = await query<any[]>(
+        `SELECT sas.*, yl.level_name 
+         FROM student_academic_status sas
+         JOIN year_levels yl ON sas.year_level_id = yl.year_level_id
+         WHERE sas.user_id = ? AND sas.semester_id = ?`,
+        [user_id, id]
       );
-      const oldYearLevel = profileRows[0]?.year_level ?? null;
+      
+      const currentSas = statusRows[0];
+      const oldYearLevelName = currentSas?.level_name ?? '1st Year';
+      const oldYearLevelId = currentSas?.year_level_id ?? ylMap['1st Year'];
 
       // 6 — Determine outcome
       const hasDropped     = enrollments.some(e => e.enroll_status === 'Dropped');
@@ -66,44 +79,51 @@ export const POST = apiHandler(async (req: NextRequest, ctx: { params: Promise<{
       const hasIncomplete  = enrollments.some(e => e.remarks === 'Incomplete' || e.remarks === null);
       const allPassed      = enrollments.every(e => e.remarks === 'Passed');
 
-      let newYearLevel = oldYearLevel;
-      let reason: string;
-      let academicStatus: string = profileRows[0]?.academic_status ?? 'Good Standing';
+      let newYearLevelName = oldYearLevelName;
+      let reason: 'Promoted' | 'Failed' | 'Dropped' | 'Incomplete Resolved' | 'Manual Override';
+      let academicStatus: 'Good Standing' | 'At Risk' | 'Irregular' | 'Graduating' = currentSas?.academic_status ?? 'Good Standing';
 
       if (hasDropped || hasFailed) {
-        // Case B & D — Failed / Dropped
-        newYearLevel  = 'Irregular';
-        reason        = hasDropped ? 'Dropped' : 'Failed';
-        academicStatus = 'Irregular';
+        newYearLevelName = 'Irregular';
+        reason          = hasDropped ? 'Dropped' : 'Failed';
+        academicStatus  = 'Irregular';
       } else if (hasIncomplete) {
-        // Case C — Incomplete: skip, do not advance
         summary.push({ user_id, result: 'Skipped (Incomplete grades pending)' });
         continue;
       } else if (allPassed) {
-        // Case A — Promote
-        const next = getNextYearLevel(oldYearLevel);
-        newYearLevel   = next;
+        const idx = YEAR_LEVEL_ORDER.indexOf(oldYearLevelName);
+        if (idx !== -1 && idx < YEAR_LEVEL_ORDER.length - 1) {
+          newYearLevelName = YEAR_LEVEL_ORDER[idx + 1];
+        }
         reason         = 'Promoted';
-        academicStatus = newYearLevel === '4th Year' ? 'Graduating' : 'Good Standing';
+        academicStatus = newYearLevelName === '4th Year' ? 'Graduating' : 'Good Standing';
       } else {
         summary.push({ user_id, result: 'No change (no grades recorded)' });
         continue;
       }
 
-      // 7 — Update profiles
-      await query(
-        'UPDATE profiles SET year_level = ?, academic_status = ? WHERE user_id = ?',
-        [newYearLevel, academicStatus, user_id]
-      );
+      const newYearLevelId = ylMap[newYearLevelName];
+
+      // 7 — Update/Create student_academic_status for the NEXT record? 
+      // Actually, we usually update the CURRENT record or wait for next semester creation.
+      // But we must also log it.
+      
+      // Update current status record
+      if (currentSas) {
+        await query(
+          'UPDATE student_academic_status SET year_level_id = ?, academic_status = ? WHERE status_id = ?',
+          [newYearLevelId, academicStatus, currentSas.status_id]
+        );
+      }
 
       // 8 — Log to academic_records
       await query(
-        `INSERT INTO academic_records (user_id, semester_id, old_year_level, new_year_level, reason)
+        `INSERT INTO academic_records (user_id, semester_id, old_year_level_id, new_year_level_id, reason)
          VALUES (?, ?, ?, ?, ?)`,
-        [user_id, id, oldYearLevel, newYearLevel, reason!]
+        [user_id, id, oldYearLevelId, newYearLevelId, reason]
       );
 
-      summary.push({ user_id, result: `${oldYearLevel} → ${newYearLevel} (${reason!})` });
+      summary.push({ user_id, result: `${oldYearLevelName} → ${newYearLevelName} (${reason})` });
     }
   }
 

@@ -22,9 +22,9 @@ export const POST = apiHandler(async (req: NextRequest) => {
   const studentId = await transaction(async (conn) => {
     // Fetch profile — status now in applications table
     const [profiles] = await conn.execute(
-      `SELECT p.*, app.application_id, app.status AS app_status
+      `SELECT p.*, app.application_id, app.applicant_status AS app_status
        FROM profiles p
-       LEFT JOIN applications app ON app.user_id = p.user_id
+       LEFT JOIN applications app ON app.profile_id = p.profile_id
        WHERE p.profile_id = ?
        FOR UPDATE`,
       [applicant_id]
@@ -67,9 +67,12 @@ export const POST = apiHandler(async (req: NextRequest) => {
     const plain   = generateDefaultPassword(profile.last_name);
     const hashed  = await hashPassword(plain);
 
+    const cleanStr = (s: string) => s ? s.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+    const instEmail = `${cleanStr(profile.first_name)}.${cleanStr(profile.last_name)}@acadtrack.edu`;
+
     await conn.execute(
       'INSERT INTO users (user_id, email, password_hash, role_id, must_change_password) VALUES (?, ?, ?, 3, TRUE)',
-      [userId, profile.personal_email, hashed]
+      [userId, instEmail, hashed]
     );
 
     // Link profile to new user
@@ -78,13 +81,13 @@ export const POST = apiHandler(async (req: NextRequest) => {
     // Update application status
     if (profile.application_id) {
       await conn.execute(
-        'UPDATE applications SET status = ?, resolved_at = NOW() WHERE application_id = ?',
-        ['Enrolled', profile.application_id]
+        'UPDATE applications SET applicant_status = ?, user_id = ? WHERE application_id = ?',
+        ['Enrolled', userId, profile.application_id]
       );
     } else {
       await conn.execute(
-        'INSERT INTO applications (user_id, status, resolved_at) VALUES (?, ?, NOW())',
-        [userId, 'Enrolled']
+        'INSERT INTO applications (user_id, profile_id, course_id, applicant_status) VALUES (?, ?, ?, ?)',
+        [userId, applicant_id, profile.course_id, 'Enrolled']
       );
     }
 
@@ -107,10 +110,10 @@ export const POST = apiHandler(async (req: NextRequest) => {
       );
     }
 
-    return { userId, plain, profile, sectionData: section };
+    return { userId, plain, profile, sectionData: section, instEmail };
   });
 
-  const { userId, plain, profile, sectionData } = studentId as any;
+  const { userId, plain, profile, sectionData, instEmail } = studentId as any;
 
   const sectionInfo = await query<any[]>(
     `SELECT s.section_name, sem.term, sem.school_year
@@ -137,7 +140,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
       firstName: profile.first_name,
       lastName:  profile.last_name,
       studentId: userId,
-      email:     profile.personal_email,
+      email:     instEmail,
       password:  plain,
       section:   info?.section_name  ?? '',
       subjects:  subjects,

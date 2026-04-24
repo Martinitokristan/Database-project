@@ -6,8 +6,16 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME!,
   user:     process.env.DB_USER!,
   password: process.env.DB_PASS!,
+  ssl:      process.env.DB_SSL === 'true' ? {
+    rejectUnauthorized: true,
+  } : undefined,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000, // 10 seconds
+  connectTimeout: 10000, // 10 seconds
+  maxIdle: 10,
+  idleTimeout: 20000,
   waitForConnections: true,
-  connectionLimit:    10,
+  connectionLimit:    20,
   queueLimit:         0,
 });
 
@@ -15,8 +23,23 @@ export async function query<T = any>(
   sql: string,
   values?: any[]
 ): Promise<T> {
-  const [rows] = await pool.execute(sql, values);
-  return rows as T;
+  let retries = 3;
+  while (retries > 0) {
+    try {
+      const [rows] = await pool.execute(sql, values);
+      return rows as T;
+    } catch (err: any) {
+      if (err.code === 'ECONNRESET' || err.code === 'PROTOCOL_CONNECTION_LOST') {
+        retries--;
+        if (retries === 0) throw err;
+        // Wait a bit before retrying
+        await new Promise(resolve => setTimeout(resolve, 500));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('Query failed after max retries');
 }
 
 export async function transaction<T>(

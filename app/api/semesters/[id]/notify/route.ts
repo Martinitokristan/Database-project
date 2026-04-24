@@ -14,10 +14,16 @@ export const POST = apiHandler(async (req: NextRequest, ctx: { params: Promise<{
   const semester = sem[0];
 
   const body = await req.json().catch(() => ({}));
-  const type: 'midterm' | 'final' = body.type === 'final' ? 'final' : 'midterm';
+  if (!body.type) {
+    return json({ success: false, message: 'Notification type (midterm/final) is required.' }, 400);
+  }
+
+  // Handle both 'final' and 'finals' just in case
+  const isFinal = body.type === 'final' || body.type === 'finals';
+  const type: 'midterm' | 'final' = isFinal ? 'final' : 'midterm';
 
   const deadlineValue = type === 'midterm' ? semester.midterm_deadline : semester.final_deadline;
-  const typeLabel     = type === 'midterm' ? 'Midterm' : 'Final';
+  const typeLabel     = type === 'midterm' ? 'Midterm' : 'Finals';
 
   if (!deadlineValue) {
     return json({
@@ -29,10 +35,11 @@ export const POST = apiHandler(async (req: NextRequest, ctx: { params: Promise<{
   /* ── Fetch all faculty who teach in this semester ── */
   const faculty = await query<any[]>(
     `SELECT DISTINCT u.user_id, u.email, p.first_name, p.last_name
-     FROM sections s
-     JOIN users u    ON u.user_id = s.instructor_id
-     JOIN profiles p ON p.user_id = u.user_id
-     WHERE s.semester_id = ? AND u.is_active = 1`,
+     FROM subject_offerings so
+     JOIN sections sec ON sec.section_id = so.section_id
+     JOIN users u    ON u.user_id = so.instructor_id
+     LEFT JOIN profiles p ON p.user_id = u.user_id
+     WHERE sec.semester_id = ? AND u.is_active = 1`,
     [id]
   );
 
@@ -82,6 +89,7 @@ export const POST = apiHandler(async (req: NextRequest, ctx: { params: Promise<{
     data: {
       sent,
       failed,
+      type: typeLabel,
       faculty: faculty.map(f => `${f.first_name} ${f.last_name} <${f.email}>`),
     },
   });

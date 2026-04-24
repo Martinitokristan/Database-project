@@ -34,36 +34,23 @@ export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
       [id]
     ) as any;
 
-    // Fetch options for all questions
+    // Fetch options for all questions (including correct answers for Identification)
     const [options] = await pool.execute(
       'SELECT * FROM assessment_options WHERE question_id IN (SELECT question_id FROM assessment_questions WHERE assessment_id = ?)',
       [id]
     ) as any;
 
-    // Fetch answers for all questions
-    const [answers] = await pool.execute(
-      'SELECT * FROM assessment_answers WHERE question_id IN (SELECT question_id FROM assessment_questions WHERE assessment_id = ?)',
-      [id]
-    ) as any;
-
-    // Group options and answers by question_id
+    // Group options by question_id
     const optionsByQuestion: Record<number, any[]> = {};
     for (const opt of options) {
       if (!optionsByQuestion[opt.question_id]) optionsByQuestion[opt.question_id] = [];
       optionsByQuestion[opt.question_id].push(opt);
     }
 
-    const answersByQuestion: Record<number, any[]> = {};
-    for (const ans of answers) {
-      if (!answersByQuestion[ans.question_id]) answersByQuestion[ans.question_id] = [];
-      answersByQuestion[ans.question_id].push(ans);
-    }
-
     // Build final question objects
     const parsed = questions.map((q: any) => ({
       ...q,
       options: optionsByQuestion[q.question_id] || [],
-      answers: answersByQuestion[q.question_id] || [],
     }));
 
     return json({ success: true, data: { ...assessment, questions: parsed } });
@@ -84,7 +71,7 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
 
     const {
       title, description, assessment_type, timer_minutes, per_question_timer,
-      shuffle_questions, shuffle_choices, allow_retakes, max_attempts,
+      shuffle_questions, shuffle_choices, max_attempts,
       assessment_password, open_at, close_at, is_open, show_results,
     } = body;
 
@@ -93,7 +80,7 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
         title = ?, description = ?, assessment_type = ?,
         timer_minutes = ?, per_question_timer = ?,
         shuffle_questions = ?, shuffle_choices = ?,
-        allow_retakes = ?, max_attempts = ?,
+        max_attempts = ?,
         assessment_password = ?, open_at = ?, close_at = ?,
         is_open = ?, show_results = ?
       WHERE assessment_id = ?
@@ -101,7 +88,7 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
       title, description || null, assessment_type,
       timer_minutes || null, per_question_timer || null,
       shuffle_questions ? 1 : 0, shuffle_choices ? 1 : 0,
-      allow_retakes ? 1 : 0, max_attempts || 1,
+      max_attempts || 1,
       assessment_password || null, open_at || null, close_at || null,
       is_open ? 1 : 0, show_results ? 1 : 0,
       id,

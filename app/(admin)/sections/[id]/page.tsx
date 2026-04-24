@@ -18,7 +18,7 @@ import { sectionService } from '@/services/sectionService';
 import { scheduleService } from '@/services/scheduleService';
 import { subjectService } from '@/services/subjectService';
 import { toast } from 'sonner';
-import { Plus, Trash2, Loader2, ArrowLeft, FileDown } from 'lucide-react';
+import { Plus, Trash2, Loader2, ArrowLeft, FileDown, Pencil, Eye } from 'lucide-react';
 import Link from 'next/link';
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] as const;
@@ -39,6 +39,14 @@ export default function SectionDetailPage({ params }: { params: Promise<{ id: st
 
   const [subjects, setSubjects] = useState<any[]>([]);
   const [faculties, setFaculties] = useState<any[]>([]);
+
+  // Section Renaming
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [newName, setNewName] = useState('');
+
+  // Offering Editing
+  const [editOfferingTarget, setEditOfferingTarget] = useState<any>(null);
+  const [editOfferingForm, setEditOfferingForm] = useState<any>(null);
 
   const [offeringForm, setOfferingForm] = useState({
     subject_id: '',
@@ -70,6 +78,8 @@ export default function SectionDetailPage({ params }: { params: Promise<{ id: st
 
   async function handleAddOffering() {
     if (!offeringForm.subject_id) return toast.error('Subject is required.');
+    if (!offeringForm.room) return toast.error('Room is required.');
+    if (!offeringForm.start_time || !offeringForm.end_time) return toast.error('Schedule times are required.');
     setSaving(true);
     const payload = {
       section_id: Number(id),
@@ -150,10 +160,44 @@ export default function SectionDetailPage({ params }: { params: Promise<{ id: st
       <div className="mb-4">
         <Link href="/semesters"><Button variant="ghost" size="sm" className="gap-1"><ArrowLeft className="h-4 w-4" />Back</Button></Link>
       </div>
-      <PageHeader
-        title={section.section_name}
-        description={`Cohort · ${section.term} ${section.school_year} — Capacity: ${section.capacity}`}
-      />
+      <div className="flex items-center gap-3 mb-6">
+        {isEditingName ? (
+          <div className="flex items-center gap-2">
+            <Input 
+              value={newName} 
+              onChange={e => setNewName(e.target.value)} 
+              className="text-2xl font-bold h-10 w-[300px]"
+              autoFocus
+            />
+            <Button size="sm" onClick={async () => {
+              if (!newName.trim()) return;
+              setSaving(true);
+              const res = await sectionService.update(Number(id), { section_name: newName.trim() });
+              setSaving(false);
+              if (res.success) {
+                toast.success('Section renamed.');
+                setIsEditingName(false);
+                load();
+              } else toast.error(res.message);
+            }}>Save</Button>
+            <Button size="sm" variant="ghost" onClick={() => setIsEditingName(false)}>Cancel</Button>
+          </div>
+        ) : (
+          <>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">{section.section_name}</h1>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600" onClick={() => {
+              setNewName(section.section_name);
+              setIsEditingName(true);
+            }}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </>
+        )}
+      </div>
+      
+      <p className="text-sm text-muted-foreground mb-8">
+        Cohort · {section.term} {section.school_year} — Capacity: {section.capacity}
+      </p>
 
       <Tabs defaultValue="classes">
         <TabsList className="mb-4">
@@ -213,9 +257,33 @@ export default function SectionDetailPage({ params }: { params: Promise<{ id: st
                         </TableCell>
                         <TableCell className="text-sm">{o.credit_units}</TableCell>
                         <TableCell>
-                          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => toast.error('Implementation required.')}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Link href={`/grade-manager?offering_id=${o.offering_id}`}>
+                              <Button size="sm" variant="ghost" className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="View Grades">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                            <Button 
+                              size="sm" variant="ghost" className="h-8 w-8 text-amber-600 hover:bg-amber-50" 
+                              title="Edit Offering"
+                              onClick={() => {
+                                setEditOfferingTarget(o);
+                                // Parse existing schedule details to populate form
+                                const firstSched = o.schedule_details?.split(', ')[0] || '';
+                                const [days, time] = firstSched.split(' ');
+                                const [start, end] = (time || '').split('-');
+                                setEditOfferingForm({
+                                  instructor_id: o.instructor_id || 'none',
+                                  day_of_week: days || 'Monday',
+                                  room: o.room || '',
+                                  start_time: start || '',
+                                  end_time: end || ''
+                                });
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -292,7 +360,7 @@ export default function SectionDetailPage({ params }: { params: Promise<{ id: st
               <Select value={offeringForm.instructor_id} onValueChange={v => setOfferingForm(f => ({ ...f, instructor_id: v }))}>
                 <SelectTrigger><SelectValue placeholder="Select instructor" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Unassigned</SelectItem>
+                  <SelectItem value="none">Unassigned</SelectItem>
                   {faculties.map((fac: any) => (
                     <SelectItem key={fac.user_id} value={fac.user_id}>
                       {fac.last_name}, {fac.first_name}
@@ -377,6 +445,94 @@ export default function SectionDetailPage({ params }: { params: Promise<{ id: st
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddStudentOpen(false)}>Cancel</Button>
             <Button onClick={handleAddStudent} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add Student</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editOfferingTarget} onOpenChange={o => !o && setEditOfferingTarget(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Subject Offering</DialogTitle></DialogHeader>
+          {editOfferingForm && (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Instructor</Label>
+                <Select value={editOfferingForm.instructor_id} onValueChange={v => setEditOfferingForm((f: any) => ({ ...f, instructor_id: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Unassigned</SelectItem>
+                    {faculties.map((fac: any) => (
+                      <SelectItem key={fac.user_id} value={fac.user_id}>{fac.last_name}, {fac.first_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3 pt-3 border-t">
+                <div className="space-y-1.5 col-span-2">
+                  <Label className="text-xs">Day of Week</Label>
+                  <Select value={editOfferingForm.day_of_week} onValueChange={v => setEditOfferingForm((f: any) => ({ ...f, day_of_week: v }))}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {DAYS.map(d => <SelectItem key={d} value={d} className="text-xs">{d}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Room</Label>
+                  <Input className="h-8 text-xs" value={editOfferingForm.room} onChange={e => setEditOfferingForm((f: any) => ({ ...f, room: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Time In</Label>
+                  <Input type="time" className="h-8 text-xs" value={editOfferingForm.start_time} onChange={e => setEditOfferingForm((f: any) => ({ ...f, start_time: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Time Out</Label>
+                  <Input type="time" className="h-8 text-xs" value={editOfferingForm.end_time} onChange={e => setEditOfferingForm((f: any) => ({ ...f, end_time: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOfferingTarget(null)}>Cancel</Button>
+            <Button disabled={saving} onClick={async () => {
+              if (!editOfferingTarget) return;
+              setSaving(true);
+              try {
+                // 1. Update Offering (Instructor)
+                await fetch(`/api/subject-offerings/${editOfferingTarget.offering_id}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ instructor_id: editOfferingForm.instructor_id === 'none' ? null : editOfferingForm.instructor_id })
+                });
+                
+                // 2. Simple Schedule logic: delete old and add new (simplified for this UI)
+                const sres = await fetch(`/api/schedules?offering_id=${editOfferingTarget.offering_id}`).then(r => r.json());
+                if (sres.success) {
+                  for (const s of sres.data) {
+                    await fetch(`/api/schedules/${s.schedule_id}`, { method: 'DELETE' });
+                  }
+                }
+                
+                await fetch('/api/schedules', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    offering_id: editOfferingTarget.offering_id,
+                    day_of_week: editOfferingForm.day_of_week,
+                    start_time: editOfferingForm.start_time,
+                    end_time: editOfferingForm.end_time,
+                    room: editOfferingForm.room
+                  })
+                });
+
+                toast.success('Offering updated.');
+                setEditOfferingTarget(null);
+                load();
+              } catch (err) {
+                toast.error('Failed to update.');
+              } finally {
+                setSaving(false);
+              }
+            }}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

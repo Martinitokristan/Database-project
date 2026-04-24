@@ -40,7 +40,9 @@ const schema = z.object({
   home_postalCode: z.string().optional(),
   home_streetBarangay: z.string().optional(),
   // Consent
-  agreeTerms: z.boolean().refine(v => v === true, { message: 'You must agree to the Privacy Policy and Terms' }),
+  agreeTerms: z.literal(true, {
+    error: 'Please review the Privacy Policy and Terms and Condition before submitting your application, Thank you!'
+  }),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -61,7 +63,7 @@ export default function ApplyPage() {
 
   const {
     register, handleSubmit, setValue, watch, formState: { errors }, reset, trigger,
-  } = useForm<FormData>({ resolver: zodResolver(schema), defaultValues: { agreeTerms: undefined as any } });
+  } = useForm<FormData>({ resolver: zodResolver(schema), defaultValues: {} });
 
   // Load static data
   useEffect(() => {

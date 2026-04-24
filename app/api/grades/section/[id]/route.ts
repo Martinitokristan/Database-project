@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { query } from '@/lib/db';
 import { apiHandler, json, getTokenPayload } from '@/lib/middleware';
+import { percentToGrade } from '@/lib/auth';
 
 export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
   const payload = getTokenPayload(req);
@@ -13,12 +14,14 @@ export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
 
   if (isNaN(sectionId)) throw { status: 400, message: 'Invalid ID format.' };
 
-  // Get aggregated averages for the section (midterm + final only, no prelim)
+  // Get aggregated averages for the section across all periods
   const grades = await query<any[]>(
     `SELECT e.enrollment_id, e.user_id,
             p.first_name, p.last_name,
             u.email,
+            AVG(g.prelim_grade) AS prelim,
             AVG(g.midterm_grade) AS midterm,
+            AVG(g.semi_final_grade) AS semi_final,
             AVG(g.final_grade) AS final_grade
      FROM enrollments e
      JOIN users u ON e.user_id = u.user_id
@@ -32,24 +35,32 @@ export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
   );
 
   const mapped = grades.map(g => {
-    const m = Number(g.midterm) || 0;
-    const f = Number(g.final_grade) || 0;
+    const p_grade = Number(g.prelim) || 0;
+    const m_grade = Number(g.midterm) || 0;
+    const s_grade = Number(g.semi_final) || 0;
+    const f_grade = Number(g.final_grade) || 0;
 
     let parts = 0, sum = 0;
-    if (m > 0) { sum += m; parts++; }
-    if (f > 0) { sum += f; parts++; }
+    if (p_grade > 0) { sum += p_grade; parts++; }
+    if (m_grade > 0) { sum += m_grade; parts++; }
+    if (s_grade > 0) { sum += s_grade; parts++; }
+    if (f_grade > 0) { sum += f_grade; parts++; }
 
-    const avg = parts > 0 ? (sum / parts) : 0;
+    const avgPct = parts > 0 ? (sum / parts) : 0;
+    const gradeEq = avgPct > 0 ? percentToGrade(avgPct) : '—';
+    const gradeVal = parseFloat(gradeEq);
 
     return {
       enrollment_id: g.enrollment_id,
       user_id: g.user_id,
       first_name: g.first_name,
       last_name: g.last_name,
-      midterm_grade: m > 0 ? m.toFixed(2) : null,
-      final_grade: f > 0 ? f.toFixed(2) : null,
-      average: avg > 0 ? avg.toFixed(2) : '0.00',
-      remarks: avg > 0 ? (avg <= 3.0 ? 'Passed' : 'Failed') : null
+      prelim_grade: p_grade > 0 ? p_grade.toFixed(2) : null,
+      midterm_grade: m_grade > 0 ? m_grade.toFixed(2) : null,
+      semi_final_grade: s_grade > 0 ? s_grade.toFixed(2) : null,
+      final_grade: f_grade > 0 ? f_grade.toFixed(2) : null,
+      average: gradeEq,
+      remarks: avgPct > 0 ? (gradeVal <= 3.0 ? 'Passed' : 'Failed') : null
     };
   });
 

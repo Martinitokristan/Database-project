@@ -13,6 +13,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { gradeService } from '@/services/gradeService';
 import { reports } from '@/lib/reports';
 import { FileText, Download } from 'lucide-react';
+import { percentToGrade } from '@/lib/auth';
 
 export default function GradesPage() {
   const { role, isLoading } = useAuth();
@@ -143,19 +144,26 @@ function AdminGrades() {
                    </TableHeader>
                    <TableBody>
                      {sorted.map((g, i) => (
-                       <TableRow key={g.enrollment_id}>
-                         <TableCell className="text-muted-foreground text-sm">{i + 1}</TableCell>
-                         <TableCell>
-                           <p className="font-bold whitespace-nowrap">{g.last_name}, {g.first_name}</p>
-                           <p className="text-[10px] text-muted-foreground font-mono">{g.user_id}</p>
-                         </TableCell>
-                         <TableCell className="text-center">{g.prelim_grade ?? '—'}</TableCell>
-                         <TableCell className="text-center">{g.midterm_grade ?? '—'}</TableCell>
-                         <TableCell className="text-center">{g.semi_final_grade ?? '—'}</TableCell>
-                         <TableCell className="text-center">{g.final_grade ?? '—'}</TableCell>
-                         <TableCell className="text-center font-black bg-muted/10">{g.average}</TableCell>
-                         <TableCell>{g.remarks ? <StatusBadge status={g.remarks} /> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
-                       </TableRow>
+                        <TableRow key={g.enrollment_id}>
+                          <TableCell className="text-muted-foreground text-sm">{i + 1}</TableCell>
+                          <TableCell>
+                            <p className="font-bold whitespace-nowrap">{g.last_name}, {g.first_name}</p>
+                            <p className="text-[10px] text-muted-foreground font-mono">{g.user_id}</p>
+                          </TableCell>
+                          <TableCell className="text-center">{g.prelim_grade ?? '—'}</TableCell>
+                          <TableCell className="text-center">{g.midterm_grade ?? '—'}</TableCell>
+                          <TableCell className="text-center">{g.semi_final_grade ?? '—'}</TableCell>
+                          <TableCell className="text-center">{g.final_grade ?? '—'}</TableCell>
+                          <TableCell className="text-center font-black bg-muted/10">
+                             {(() => {
+                               if (g.average === '—' || !g.average) return <span className="text-muted-foreground">—</span>;
+                               const gradeVal = parseFloat(g.average);
+                               const colorClass = gradeVal <= 1.5 ? 'text-emerald-600' : (gradeVal <= 3.0 ? 'text-indigo-600' : 'text-red-600');
+                               return <span className={colorClass}>{g.average}</span>;
+                             })()}
+                          </TableCell>
+                          <TableCell>{g.remarks ? <StatusBadge status={g.remarks} /> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
+                        </TableRow>
                      ))}
                    </TableBody>
                  </Table>
@@ -261,14 +269,17 @@ function StudentGrades() {
                       {(semGrades as any[]).map(g => {
                         const m = g.midterm_grade != null ? Number(g.midterm_grade) : null;
                         const f = g.final_grade != null ? Number(g.final_grade) : null;
-                        let avg = '—';
-                        if (m != null && f != null) {
-                          avg = ((m + f) / 2).toFixed(2);
-                        } else if (m != null) {
-                          avg = m.toFixed(2);
-                        } else if (f != null) {
-                          avg = f.toFixed(2);
+                        let avgText = '—';
+                        let gradeVal = 5.0;
+
+                        if (m != null || f != null) {
+                          const avgPct = (m != null && f != null) ? (m + f) / 2 : (m ?? f ?? 0);
+                          avgText = percentToGrade(avgPct);
+                          gradeVal = parseFloat(avgText);
                         }
+
+                        const colorClass = gradeVal <= 1.5 ? 'text-emerald-600' : (gradeVal <= 3.0 ? 'text-indigo-600' : 'text-red-600');
+
                         return (
                           <TableRow key={g.grade_id || g.enrollment_id}>
                             <TableCell>
@@ -281,7 +292,9 @@ function StudentGrades() {
                             <TableCell className="text-center font-medium">{g.midterm_grade ?? <span className="text-muted-foreground">—</span>}</TableCell>
                             <TableCell className="text-center font-medium">{g.semi_final_grade ?? <span className="text-muted-foreground">—</span>}</TableCell>
                             <TableCell className="text-center font-medium">{g.final_grade ?? <span className="text-muted-foreground">—</span>}</TableCell>
-                            <TableCell className="text-center font-black bg-muted/10">{avg}</TableCell>
+                            <TableCell className="text-center font-black bg-muted/10">
+                              <span className={colorClass}>{avgText}</span>
+                            </TableCell>
                             <TableCell>{g.remarks ? <StatusBadge status={g.remarks} /> : <span className="text-xs text-muted-foreground">Pending</span>}</TableCell>
                           </TableRow>
                         );

@@ -28,18 +28,37 @@ export const POST = apiHandler(async (req: NextRequest, ctx: { params: Promise<{
     ['Failed', id]
   );
 
-  // 3 — Fetch current year level
-  const profileRows = await query<any[]>('SELECT year_level FROM profiles WHERE user_id = ?', [enrollment.user_id]);
-  const oldYearLevel = profileRows[0]?.year_level ?? null;
+  // 3 — Fetch current status and year level mapping
+  const ylRows = await query<any[]>('SELECT year_level_id, level_name FROM year_levels');
+  const ylMap = Object.fromEntries(ylRows.map(r => [r.level_name, r.year_level_id]));
+  
+  const statusRows = await query<any[]>(
+    'SELECT status_id, year_level_id FROM student_academic_status WHERE user_id = ? AND semester_id = ?',
+    [enrollment.user_id, enrollment.semester_id]
+  );
+  
+  const currentSas = statusRows[0];
+  const oldYearLevelId = currentSas?.year_level_id || ylMap['1st Year'];
+  const irregularId = ylMap['Irregular'];
 
-  // 4 — Set student to Irregular
-  await query('UPDATE profiles SET year_level = ?, academic_status = ? WHERE user_id = ?', ['Irregular', 'Irregular', enrollment.user_id]);
+  // 4 — Set student to Irregular in current status record
+  if (currentSas) {
+    await query(
+      'UPDATE student_academic_status SET year_level_id = ?, academic_status = ? WHERE status_id = ?',
+      [irregularId, 'Irregular', currentSas.status_id]
+    );
+  } else {
+    await query(
+      'INSERT INTO student_academic_status (user_id, semester_id, year_level_id, academic_status) VALUES (?, ?, ?, ?)',
+      [enrollment.user_id, enrollment.semester_id, irregularId, 'Irregular']
+    );
+  }
 
   // 5 — Log to academic_records
   await query(
-    `INSERT INTO academic_records (user_id, semester_id, old_year_level, new_year_level, reason, notes)
+    `INSERT INTO academic_records (user_id, semester_id, old_year_level_id, new_year_level_id, reason, notes)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [enrollment.user_id, enrollment.semester_id, oldYearLevel, 'Irregular', 'Dropped', `Enrollment #${id} dropped by admin`]
+    [enrollment.user_id, enrollment.semester_id, oldYearLevelId, irregularId, 'Dropped', `Enrollment #${id} dropped by admin`]
   );
 
   return json({ success: true, message: 'Enrollment dropped. Student marked as Irregular.' });

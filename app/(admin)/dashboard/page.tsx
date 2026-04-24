@@ -48,7 +48,7 @@ export default function DashboardPage() {
   const statCards = [
     { label: 'Total Students',   value: stats?.students  ?? '—', icon: Users,          color: 'text-blue-600' },
     { label: 'Active Sections',  value: stats?.sections  ?? '—', icon: Layers,         color: 'text-purple-600' },
-    { label: 'Pending Applicants', value: stats?.pending ?? '—', icon: ClipboardList,  color: 'text-yellow-600' },
+    { label: 'Pending Enrollees', value: stats?.pending ?? '—', icon: ClipboardList,  color: 'text-yellow-600' },
     { label: 'Active Semester',  value: stats?.semester?.term ?? 'None', icon: Calendar, color: 'text-green-600' },
   ];
 
@@ -74,11 +74,11 @@ export default function DashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Recent Pending Applications</CardTitle>
+          <CardTitle className="text-base">Recent Pending Enrollees</CardTitle>
         </CardHeader>
         <CardContent>
           {applicants.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">No pending applications.</p>
+            <p className="text-sm text-muted-foreground text-center py-6">No pending enrollees.</p>
           ) : (
             <Table>
               <TableHeader>

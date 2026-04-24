@@ -73,9 +73,10 @@ export interface Subject {
   code:         string;
   title:        string;
   credit_units: number;
-  subject_type?:string;
-  year_level?:  string | null;
-  course?:      Course;
+  subject_type?:   string;
+  year_level?:     string | null;
+  prerequisite_id?: number | null;
+  course?:         Course;
   // Joined fields
   dept_id?:     number;
   course_name?: string;

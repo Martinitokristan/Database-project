@@ -38,23 +38,11 @@ export const POST = apiHandler(async (req: NextRequest, ctx: { params: Promise<{
     [id]
   ) as any;
 
-  // Fetch answers for all questions
-  const [answers] = await pool.execute(
-    'SELECT * FROM assessment_answers WHERE question_id IN (SELECT question_id FROM assessment_questions WHERE assessment_id = ?)',
-    [id]
-  ) as any;
-
-  // Group options and answers by question_id
+  // Group options by question_id
   const optionsByQuestion: Record<number, any[]> = {};
   for (const opt of options) {
     if (!optionsByQuestion[opt.question_id]) optionsByQuestion[opt.question_id] = [];
     optionsByQuestion[opt.question_id].push(opt);
-  }
-
-  const answersByQuestion: Record<number, any[]> = {};
-  for (const ans of answers) {
-    if (!answersByQuestion[ans.question_id]) answersByQuestion[ans.question_id] = [];
-    answersByQuestion[ans.question_id].push(ans);
   }
 
   let totalPoints = 0;
@@ -63,7 +51,6 @@ export const POST = apiHandler(async (req: NextRequest, ctx: { params: Promise<{
   const result = await transaction(async (conn) => {
     for (const q of questions) {
       const opts    = optionsByQuestion[q.question_id] || [];
-      const acc     = answersByQuestion[q.question_id] || [];
       const maxPts  = parseFloat(q.points);
       totalPoints  += maxPts;
 
@@ -80,8 +67,11 @@ export const POST = apiHandler(async (req: NextRequest, ctx: { params: Promise<{
           const given = q.case_sensitive
             ? resp.response_text?.trim()
             : resp.response_text?.trim().toLowerCase();
-          isCorrect = acc.some((a: any) =>
-            q.case_sensitive ? a.answer_text?.trim() === given : a.answer_text?.trim().toLowerCase() === given
+          
+          // Answers are now stored in assessment_options with is_correct = 1
+          const correctAnswers = opts.filter((o: any) => o.is_correct);
+          isCorrect = correctAnswers.some((a: any) =>
+            q.case_sensitive ? a.option_text?.trim() === given : a.option_text?.trim().toLowerCase() === given
           );
           earned = isCorrect ? maxPts : 0;
         } else if (q.question_type === 'Matching') {

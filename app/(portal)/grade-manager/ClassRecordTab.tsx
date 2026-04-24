@@ -13,11 +13,15 @@ import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { toast } from 'sonner';
-import { Plus, Save, Loader2, Calendar, Edit, Trash2 } from 'lucide-react';
+import { GRADE_SCALE, percentToGrade } from '@/lib/auth';
+import { Plus, Save, Loader2, Calendar, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 
 interface ClassRecordTabProps {
   offeringId: string;
 }
+
+
+
 
 export function ClassRecordTab({ offeringId }: ClassRecordTabProps) {
   const [loading, setLoading] = useState(true);
@@ -129,6 +133,17 @@ export function ClassRecordTab({ offeringId }: ClassRecordTabProps) {
     }
   }
 
+  async function handleToggleVisibility(item: any) {
+    const newVal = item.visible_to_students ? 0 : 1;
+    const res = await classRecordService.updateItem(item.item_id, { visible_to_students: newVal });
+    if (res.success) {
+      toast.success(`Column is now ${newVal ? 'visible' : 'hidden'} to students`);
+      loadMatrix();
+    } else {
+      toast.error('Failed to update visibility');
+    }
+  }
+
   if (loading && !isCreating) {
     return <LoadingSpinner />;
   }
@@ -229,28 +244,33 @@ export function ClassRecordTab({ offeringId }: ClassRecordTabProps) {
                     <div className="pl-4 font-black uppercase text-[10px]">Student</div>
                   </TableHead>
                   
-                  {/* Dynamic item columns */}
-                  {items.map(item => (
-                    <TableHead key={item.item_id} className="w-[150px] border-r p-0 align-top group">
-                       <div className="h-full flex flex-col justify-between p-2">
-                         <div className="flex justify-between items-start">
-                           <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-background">{item.record_type}</Badge>
-                           <button onClick={() => handleDeleteItem(item.item_id)} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Delete Column">
-                             <Trash2 className="h-3 w-3" />
-                           </button>
-                         </div>
-                         <div className="mt-1">
-                           <p className="font-bold text-xs leading-tight truncate" title={item.title}>{item.title}</p>
-                           <p className="text-[9px] text-muted-foreground mt-0.5">{new Date(item.record_date).toLocaleDateString()}</p>
-                         </div>
-                         <div className="mt-1 text-center bg-muted/20 py-0.5 rounded text-[10px] font-mono font-bold text-muted-foreground">
-                           Max: {item.max_score}
-                         </div>
-                       </div>
-                    </TableHead>
-                  ))}
+                   {/* Dynamic item columns */}
+                   {items.map(item => (
+                     <TableHead key={item.item_id} className="w-[150px] border-r p-0 align-top group">
+                        <div className="h-full flex flex-col justify-between p-2">
+                          <div className="flex justify-between items-start">
+                            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-background">{item.record_type}</Badge>
+                            <div className="flex items-center gap-1.5 opacity-40 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => handleToggleVisibility(item)} className="hover:scale-110 transition-transform" title={item.visible_to_students ? "Hide from students" : "Make visible to students"}>
+                                {item.visible_to_students ? <Eye className="h-3 w-3 text-blue-500" /> : <EyeOff className="h-3 w-3 text-muted-foreground" />}
+                              </button>
+                              <button onClick={() => handleDeleteItem(item.item_id)} className="text-red-400 hover:text-red-600 hover:scale-110 transition-transform" title="Delete Column">
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="mt-1">
+                            <p className="font-bold text-xs leading-tight truncate" title={item.title}>{item.title}</p>
+                            <p className="text-[9px] text-muted-foreground mt-0.5">{new Date(item.record_date).toLocaleDateString()}</p>
+                          </div>
+                          <div className="mt-1 text-center bg-muted/20 py-0.5 rounded text-[10px] font-mono font-bold text-muted-foreground">
+                            Max: {item.max_score}
+                          </div>
+                        </div>
+                     </TableHead>
+                   ))}
                   
-                  <TableHead className="w-[100px] align-bottom pb-3"><div className="text-center font-black uppercase text-[10px] text-muted-foreground">Total Average</div></TableHead>
+                  <TableHead className="w-[130px] align-bottom pb-3"><div className="text-center font-black uppercase text-[10px] text-muted-foreground">Average / Grade</div></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -268,14 +288,15 @@ export function ClassRecordTab({ offeringId }: ClassRecordTabProps) {
                       score = edited;
                     }
 
-                    if (score !== null && score !== undefined && score !== '') {
+                    if (score !== null && score !== undefined) {
                       totalEarned += Number(score);
                       totalMax += Number(item.max_score);
                     }
                   });
-                  const rowAvg = (totalMax > 0 && !isNaN(totalEarned) && !isNaN(totalMax)) 
-                    ? ((totalEarned / totalMax) * 100).toFixed(2) + '%' 
-                    : '—';
+                  const pct = totalMax > 0 ? (totalEarned / totalMax) * 100 : null;
+                  const rowAvgPct  = pct !== null ? pct.toFixed(2) + '%' : '—';
+                  const rowGrade   = pct !== null ? percentToGrade(pct) : '—';
+
 
                   return (
                     <TableRow key={student.enrollment_id} className="hover:bg-muted/5 group">
@@ -310,9 +331,22 @@ export function ClassRecordTab({ offeringId }: ClassRecordTabProps) {
                         );
                       })}
 
-                      {/* Row Total Average */}
-                      <TableCell className="text-center font-bold text-xs bg-muted/10 text-muted-foreground">
-                        {rowAvg}
+                      {/* Row Average + Grade Equivalent */}
+                      <TableCell className="text-center bg-muted/10 px-2 py-1">
+                        <div className="font-bold text-xs text-muted-foreground">{rowAvgPct}</div>
+                        {rowGrade !== '—' && (() => {
+                          const g = parseFloat(rowGrade);
+                          const isFailing = g > 3.0;
+                          const colorClass = g <= 1.5 ? 'text-emerald-600'
+                            : g <= 3.0 ? 'text-blue-600'
+                            : 'text-red-500';
+                          return (
+                            <div className={`mt-0.5 font-black ${colorClass}`}>
+                              <span className="text-sm">{rowGrade}</span>
+                              {isFailing && <span className="ml-1 text-[9px] font-bold uppercase tracking-wider">FAILED</span>}
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                     </TableRow>
                   );

@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server';
 import { query } from '@/lib/db';
-import { requireAuth, apiHandler, json } from '@/lib/middleware';
+import { getTokenPayload, apiHandler, json } from '@/lib/middleware';
 
 export const GET = apiHandler(async (req: NextRequest) => {
-  const payload = requireAuth(req);
+  const payload = getTokenPayload(req);
+  if (!payload) return json({ success: false, message: 'Unauthenticated.' });
 
   const users = await query<any[]>(
     `SELECT u.user_id, u.email, u.role_id, u.must_change_password, r.role_name,

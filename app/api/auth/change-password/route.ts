@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import pool from '@/lib/db';
+import { query } from '@/lib/db';
 import { comparePassword, hashPassword, signToken } from '@/lib/auth';
 import { requireAuth, apiHandler, json } from '@/lib/middleware';
 import { cookies } from 'next/headers';
@@ -21,10 +21,10 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
   const { current_password, new_password } = parsed.data;
 
-  const [users] = await pool.execute(
+  const users = await query<any[]>(
     'SELECT * FROM users WHERE user_id = ?',
     [payload.user_id]
-  ) as any;
+  );
 
   const user = (users as any[])[0];
   if (!user) return json({ success: false, message: 'User not found.' }, 404);
@@ -34,7 +34,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
   const newHash = await hashPassword(new_password);
 
-  await pool.execute(
+  await query(
     'UPDATE users SET password_hash = ?, must_change_password = FALSE WHERE user_id = ?',
     [newHash, payload.user_id]
   );

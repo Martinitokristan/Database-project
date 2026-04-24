@@ -5,8 +5,15 @@ const COOKIE_NAME = process.env.COOKIE_NAME || 'acadtrack_token';
 
 export function getTokenPayload(req: NextRequest): TokenPayload | null {
   const cookie = req.cookies.get(COOKIE_NAME)?.value;
-  if (!cookie) return null;
-  return verifyToken(cookie);
+  if (!cookie) {
+    console.log('[AUTH] No cookie found:', COOKIE_NAME);
+    return null;
+  }
+  const payload = verifyToken(cookie);
+  if (!payload) {
+    console.log('[AUTH] Token verification failed');
+  }
+  return payload;
 }
 
 export function requireAuth(req: NextRequest): TokenPayload {

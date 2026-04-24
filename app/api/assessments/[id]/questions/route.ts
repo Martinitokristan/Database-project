@@ -37,7 +37,7 @@ export const POST = apiHandler(async (req: NextRequest, ctx: { params: Promise<{
       for (const ans of answers) {
         if (ans?.trim()) {
           await conn.execute(
-            'INSERT INTO assessment_answers (question_id, answer_text) VALUES (?, ?)',
+            'INSERT INTO assessment_options (question_id, option_text, is_correct) VALUES (?, ?, 1)',
             [questionId, ans.trim()]
           );
         }

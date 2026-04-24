@@ -9,6 +9,13 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Notification {
   notification_id: number;
@@ -42,6 +49,7 @@ function timeAgo(dateStr: string): string {
 export function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen]                   = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const unread = notifications.filter(n => !n.is_read).length;
@@ -98,6 +106,17 @@ export function NotificationBell() {
     setNotifications(prev => prev.filter(n => n.notification_id !== id));
   }
 
+  async function handleNotificationClick(n: Notification) {
+    setSelectedNotification(n);
+    if (!n.is_read) {
+      // Mark as read
+      await fetch(`/api/notifications/${n.notification_id}`, { method: 'PUT', credentials: 'include' });
+      setNotifications(prev => prev.map(item => 
+        item.notification_id === n.notification_id ? { ...item, is_read: true } : item
+      ));
+    }
+  }
+
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
@@ -147,7 +166,8 @@ export function NotificationBell() {
             notifications.map(n => (
               <div
                 key={n.notification_id}
-                className={`group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/50 ${!n.is_read ? 'bg-primary/5' : ''}`}
+                onClick={() => handleNotificationClick(n)}
+                className={`group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/50 cursor-pointer ${!n.is_read ? 'bg-primary/5' : ''}`}
               >
                 {/* Unread dot */}
                 <span className={`mt-2 h-2 w-2 shrink-0 rounded-full transition-colors ${!n.is_read ? 'bg-primary' : 'bg-transparent'}`} />
@@ -176,7 +196,10 @@ export function NotificationBell() {
                   variant="ghost" size="icon"
                   className="h-6 w-6 shrink-0 text-destructive hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
                   title="Delete"
-                  onClick={() => deleteNotification(n.notification_id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteNotification(n.notification_id);
+                  }}
                 >
                   <Trash2 className="h-3 w-3" />
                 </Button>
@@ -185,6 +208,50 @@ export function NotificationBell() {
           )}
         </div>
       </DropdownMenuContent>
+
+      <Dialog open={!!selectedNotification} onOpenChange={(open) => !open && setSelectedNotification(null)}>
+        <DialogContent className="max-w-md p-0 overflow-hidden border-none shadow-2xl">
+          <div className="bg-primary/10 px-6 py-8 flex flex-col items-center text-center gap-4">
+            <div className="h-16 w-16 rounded-2xl bg-primary/20 flex items-center justify-center">
+              <Bell className="h-8 w-8 text-primary" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/60 mb-1">Notification Detail</p>
+              <h2 className="text-xl font-black text-foreground leading-tight px-4">{selectedNotification?.title}</h2>
+            </div>
+          </div>
+          
+          <div className="p-6 space-y-6">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-muted-foreground/10">
+              <UserAvatar 
+                src={selectedNotification?.sender_role !== 'Admin' ? (selectedNotification?.sender_avatar ?? undefined) : undefined}
+                name={selectedNotification ? senderName(selectedNotification) : ''}
+                role={selectedNotification?.sender_role ?? 'Admin'}
+                size={40}
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold truncate">{selectedNotification ? senderName(selectedNotification) : ''}</p>
+                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                  {selectedNotification?.sender_role || 'System'} · {selectedNotification && timeAgo(selectedNotification.created_at)}
+                </p>
+              </div>
+            </div>
+
+            <ScrollArea className="max-h-[300px] w-full rounded-md border p-4 bg-muted/20">
+              <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+                {selectedNotification?.message}
+              </div>
+            </ScrollArea>
+
+            <Button 
+              className="w-full bg-primary hover:bg-primary/90 font-bold" 
+              onClick={() => setSelectedNotification(null)}
+            >
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DropdownMenu>
   );
 }

@@ -77,6 +77,20 @@ export default function AcademicPortal() {
   const [deleteSectionTarget, setDeleteSectionTarget] = useState<any>(null);
   const [deletingSection, setDeletingSection] = useState(false);
 
+  // Course Edit/Delete
+  const [editCourseTarget, setEditCourseTarget] = useState<Course | null>(null);
+  const [editingCourseName, setEditingCourseName] = useState('');
+  const [deleteCourseTarget, setDeleteCourseTarget] = useState<Course | null>(null);
+
+  // Subject Edit/Delete
+  const [editSubjectTarget, setEditSubjectTarget] = useState<Subject | null>(null);
+  const [deleteSubjectTarget, setDeleteSubjectTarget] = useState<Subject | null>(null);
+  const [editingSubjectForm, setEditingSubjectForm] = useState<any>(null);
+
+  // Section Edit
+  const [editSectionTarget, setEditSectionTarget] = useState<any>(null);
+  const [editingSectionName, setEditingSectionName] = useState('');
+
   // New assignment states
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
   const [selectedTermId, setSelectedTermId] = useState<string>('');
@@ -359,9 +373,36 @@ export default function AcademicPortal() {
                           )}
                           onClick={() => setSelectedCourseId(selectedCourseId === c.course_id ? null : c.course_id)}
                         >
-                          <span className={cn("font-semibold text-sm", selectedCourseId === c.course_id ? "text-indigo-700" : "")}>
+                          <div className={cn("font-semibold text-sm flex-1", selectedCourseId === c.course_id ? "text-indigo-700" : "")}>
                             {c.course_name}
-                          </span>
+                          </div>
+                          
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mr-2">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7 text-indigo-600 hover:bg-indigo-100"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditCourseTarget(c);
+                                setEditingCourseName(c.course_name);
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7 text-red-600 hover:bg-red-50"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteCourseTarget(c);
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+
                           <Badge variant={selectedCourseId === c.course_id ? "default" : "outline"} className="text-[10px] font-bold">COURSE</Badge>
                         </div>
                       ))}
@@ -446,6 +487,34 @@ export default function AcademicPortal() {
                                       <Plus className="h-3.5 w-3.5" />
                                       Assign
                                     </Button>
+
+                                    <div className="h-6 w-px bg-slate-100 mx-1" />
+
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-8 w-8 text-indigo-600 hover:bg-indigo-50"
+                                      onClick={() => {
+                                        setEditSubjectTarget(s);
+                                        setEditingSubjectForm({
+                                          ...s,
+                                          course_id: String(s.course_id),
+                                          year_level: s.year_level || '1st Year',
+                                          subject_type: s.subject_type || 'Major',
+                                          prerequisite_id: s.prerequisite_id ? String(s.prerequisite_id) : 'none'
+                                        });
+                                      }}
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-8 w-8 text-red-600 hover:bg-red-50"
+                                      onClick={() => setDeleteSubjectTarget(s)}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
                                   </div>
 
                                   {expandedSubjects.includes(s.subject_id) && (
@@ -458,7 +527,19 @@ export default function AcademicPortal() {
                                         >
                                           <div className="flex items-center justify-between p-2 pl-3">
                                             <div className="flex flex-col">
-                                              <span className="text-[11px] font-bold text-slate-800">{off.section_name}</span>
+                                              <div className="flex items-center gap-2 group/name">
+                                                <span className="text-[11px] font-bold text-slate-800">{off.section_name}</span>
+                                                <Button 
+                                                  variant="ghost" size="icon" className="h-4 w-4 opacity-0 group-hover/name:opacity-100 transition-opacity"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setEditSectionTarget(off);
+                                                    setEditingSectionName(off.section_name);
+                                                  }}
+                                                >
+                                                  <Pencil className="h-2.5 w-2.5 text-slate-400" />
+                                                </Button>
+                                              </div>
                                               <span className="text-[9px] text-indigo-500 font-medium uppercase truncate max-w-[120px]">
                                                 {off.instructor_last ? `${off.instructor_last}` : 'TBA'}
                                               </span>
@@ -1078,6 +1159,259 @@ export default function AcademicPortal() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Course Dialog */}
+      <Dialog open={!!editCourseTarget} onOpenChange={o => !o && setEditCourseTarget(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Course</DialogTitle>
+            <DialogDescription>Modify the course name for {selectedDept?.department_name}.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Course Name</Label>
+              <Input 
+                value={editingCourseName} 
+                onChange={e => setEditingCourseName(e.target.value)} 
+                placeholder="e.g., Bachelor of Science in Information Technology" 
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditCourseTarget(null)}>Cancel</Button>
+            <Button 
+              className="bg-indigo-600 hover:bg-indigo-700" 
+              disabled={savingEntity}
+              onClick={async () => {
+                if (!editCourseTarget || !selectedDept) return;
+                setSavingEntity(true);
+                const res = await courseService.update(editCourseTarget.course_id, { course_name: editingCourseName });
+                setSavingEntity(false);
+                if (res.success) {
+                  toast.success('Course updated.');
+                  setEditCourseTarget(null);
+                  loadDeptDetails(selectedDept.dept_id);
+                } else toast.error(res.message);
+              }}
+            >
+              {savingEntity && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Course Confirm */}
+      <ConfirmDialog 
+        open={!!deleteCourseTarget}
+        onOpenChange={o => !o && setDeleteCourseTarget(null)}
+        title="Delete Course?"
+        description={`This will permanently delete the course "${deleteCourseTarget?.course_name}". This may fail if there are subjects or students linked to it.`}
+        loading={savingEntity}
+        onConfirm={async () => {
+          if (!deleteCourseTarget || !selectedDept) return;
+          setSavingEntity(true);
+          const res = await courseService.remove(deleteCourseTarget.course_id);
+          setSavingEntity(false);
+          if (res.success) {
+            toast.success('Course deleted.');
+            setDeleteCourseTarget(null);
+            loadDeptDetails(selectedDept.dept_id);
+          } else toast.error(res.message);
+        }}
+      />
+
+      {/* Edit Subject Dialog */}
+      <Dialog open={!!editSubjectTarget} onOpenChange={o => !o && setEditSubjectTarget(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Subject</DialogTitle>
+            <DialogDescription>Modify subject details and curriculum settings.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2 col-span-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Parent Course</Label>
+                <Select 
+                  value={editingSubjectForm?.course_id} 
+                  onValueChange={v => setEditingSubjectForm((f: any) => ({ ...f, course_id: v }))}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select course..." /></SelectTrigger>
+                  <SelectContent>
+                    {courses.map(c => <SelectItem key={c.course_id} value={String(c.course_id)}>{c.course_name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Subject Code</Label>
+                <Input 
+                  value={editingSubjectForm?.code} 
+                  onChange={e => setEditingSubjectForm((f: any) => ({ ...f, code: e.target.value }))}
+                  placeholder="IT-101" 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Units</Label>
+                <Input 
+                  type="number" 
+                  value={editingSubjectForm?.credit_units} 
+                  onChange={e => setEditingSubjectForm((f: any) => ({ ...f, credit_units: Number(e.target.value) }))}
+                />
+              </div>
+              <div className="space-y-2 col-span-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Subject Title</Label>
+                <Input 
+                  value={editingSubjectForm?.title} 
+                  onChange={e => setEditingSubjectForm((f: any) => ({ ...f, title: e.target.value }))}
+                  placeholder="Introduction to Computing" 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Type</Label>
+                <Select 
+                  value={editingSubjectForm?.subject_type} 
+                  onValueChange={v => setEditingSubjectForm((f: any) => ({ ...f, subject_type: v }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Major">Major</SelectItem>
+                    <SelectItem value="Minor">Minor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Year Level</Label>
+                <Select 
+                  value={editingSubjectForm?.year_level} 
+                  onValueChange={v => setEditingSubjectForm((f: any) => ({ ...f, year_level: v }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1st Year">1st Year</SelectItem>
+                    <SelectItem value="2nd Year">2nd Year</SelectItem>
+                    <SelectItem value="3rd Year">3rd Year</SelectItem>
+                    <SelectItem value="4th Year">4th Year</SelectItem>
+                    <SelectItem value="Masteral">Masteral</SelectItem>
+                    <SelectItem value="Doctorate">Doctorate</SelectItem>
+                    <SelectItem value="Irregular">Irregular</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 col-span-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Prerequisite (Optional)</Label>
+                <Select 
+                  value={editingSubjectForm?.prerequisite_id} 
+                  onValueChange={v => setEditingSubjectForm((f: any) => ({ ...f, prerequisite_id: v }))}
+                >
+                  <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Prerequisite</SelectItem>
+                    {subjects
+                      .filter(s => s.subject_id !== editSubjectTarget?.subject_id)
+                      .map(s => <SelectItem key={s.subject_id} value={String(s.subject_id)}>{s.code}: {s.title}</SelectItem>)
+                    }
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditSubjectTarget(null)}>Cancel</Button>
+            <Button 
+              className="bg-indigo-600 hover:bg-indigo-700" 
+              disabled={savingEntity}
+              onClick={async () => {
+                if (!editSubjectTarget || !selectedDept) return;
+                setSavingEntity(true);
+                const data = {
+                  ...editingSubjectForm,
+                  course_id: Number(editingSubjectForm.course_id),
+                  prerequisite_id: editingSubjectForm.prerequisite_id === 'none' ? null : Number(editingSubjectForm.prerequisite_id)
+                };
+                const res = await subjectService.update(editSubjectTarget.subject_id, data);
+                setSavingEntity(false);
+                if (res.success) {
+                  toast.success('Subject updated.');
+                  setEditSubjectTarget(null);
+                  loadDeptDetails(selectedDept.dept_id);
+                } else toast.error(res.message);
+              }}
+            >
+              {savingEntity && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Subject Confirm */}
+      <ConfirmDialog 
+        open={!!deleteSubjectTarget}
+        onOpenChange={o => !o && setDeleteSubjectTarget(null)}
+        title="Delete Subject?"
+        description={`This will permanently delete the subject "${deleteSubjectTarget?.code}: ${deleteSubjectTarget?.title}". This may fail if there are active offerings or student grades linked to it.`}
+        loading={savingEntity}
+        onConfirm={async () => {
+          if (!deleteSubjectTarget || !selectedDept) return;
+          setSavingEntity(true);
+          const res = await subjectService.remove(deleteSubjectTarget.subject_id);
+          setSavingEntity(false);
+          if (res.success) {
+            toast.success('Subject deleted.');
+            setDeleteSubjectTarget(null);
+            loadDeptDetails(selectedDept.dept_id);
+          } else toast.error(res.message);
+        }}
+      />
+      {/* Edit Section Name Dialog */}
+      <Dialog open={!!editSectionTarget} onOpenChange={o => !o && setEditSectionTarget(null)}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Rename Section</DialogTitle>
+            <DialogDescription>Change the name for this academic section cohort.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Section Name</Label>
+              <Input 
+                value={editingSectionName} 
+                onChange={e => setEditingSectionName(e.target.value)} 
+                placeholder="e.g., BSIT-1A" 
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditSectionTarget(null)}>Cancel</Button>
+            <Button 
+              className="bg-indigo-600 hover:bg-indigo-700" 
+              disabled={savingEntity}
+              onClick={async () => {
+                if (!editSectionTarget || !selectedDept) return;
+                setSavingEntity(true);
+                try {
+                  const res = await fetch(`/api/sections/${editSectionTarget.section_id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ section_name: editingSectionName })
+                  }).then(r => r.json());
+
+                  if (res.success) {
+                    toast.success('Section renamed.');
+                    setEditSectionTarget(null);
+                    loadDeptDetails(selectedDept.dept_id);
+                  } else toast.error(res.message);
+                } catch (err) {
+                  toast.error('An error occurred.');
+                } finally {
+                  setSavingEntity(false);
+                }
+              }}
+            >
+              {savingEntity && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

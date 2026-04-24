@@ -43,7 +43,12 @@ export const POST = apiHandler(async (req: NextRequest) => {
     current_address, home_address, phone, gender, date_of_birth,
   } = parsed.data;
 
-  const addressJson = JSON.stringify({ current: current_address, home: home_address ?? null });
+  const currentFormat = [current_address.streetBarangay, current_address.city, current_address.province, current_address.postalCode].filter(Boolean).join(', ');
+  let homeFormat = '';
+  if (home_address && home_address.streetBarangay) {
+    homeFormat = [home_address.streetBarangay, home_address.city, home_address.province, home_address.postalCode].filter(Boolean).join(', ');
+  }
+  const addressStr = homeFormat && homeFormat !== currentFormat ? `${currentFormat} (Current) / ${homeFormat} (Home)` : currentFormat;
 
   const existing = await query<any[]>('SELECT profile_id FROM profiles WHERE personal_email = ?', [email]);
   if (existing.length > 0) {
@@ -55,21 +60,29 @@ export const POST = apiHandler(async (req: NextRequest) => {
     return json({ success: false, message: 'An account with this email already exists.' }, 409);
   }
 
-  const [result] = await query(
-    `INSERT INTO profiles (user_id, first_name, middle_name, last_name, suffix, address, phone, gender, date_of_birth, year_level, academic_status, personal_email, course_id)
-     VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, '1st Year', 'Good Standing', ?, ?)`,
-    [first_name, middle_name ?? null, last_name, suffix ?? null, addressJson, phone, gender, date_of_birth, email, course_id]
-  ) as any;
+  try {
+    const newProfileId = await transaction(async (conn) => {
+      const [result] = await conn.execute(
+        `INSERT INTO profiles (user_id, first_name, middle_name, last_name, suffix, address, phone, gender, date_of_birth, personal_email, course_id)
+         VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [first_name, middle_name ?? null, last_name, suffix ?? null, addressStr, phone, gender, date_of_birth, email, course_id]
+      );
+      
+      const insertId = (result as any).insertId;
 
-  const newProfileId = result.insertId;
+      await conn.execute(
+        `INSERT INTO applications (profile_id, course_id, applicant_status, applied_at) VALUES (?, ?, 'Pending', NOW())`,
+        [insertId, course_id]
+      );
 
-  // Create the application record in the applications table
-  await query(
-    `INSERT INTO applications (profile_id, course_id, applicant_status, applied_at) VALUES (?, ?, 'Pending', NOW())`,
-    [newProfileId, course_id]
-  );
+      return insertId;
+    });
 
-  return json({ success: true, data: { applicant_id: newProfileId }, message: 'Application submitted successfully.' }, 201);
+    return json({ success: true, data: { applicant_id: newProfileId }, message: 'Application submitted successfully.' }, 201);
+  } catch (error) {
+    console.error('Error submitting application:', error);
+    return json({ success: false, message: 'Failed to submit application. Please try again.' }, 500);
+  }
 });
 
 export const GET = apiHandler(async (req: NextRequest) => {
@@ -77,8 +90,8 @@ export const GET = apiHandler(async (req: NextRequest) => {
 
   const { searchParams } = req.nextUrl;
   const status = searchParams.get('status');
-  const page   = parseInt(searchParams.get('page') || '1');
-  const limit  = parseInt(searchParams.get('limit') || '20');
+  const page   = Math.max(1, parseInt(searchParams.get('page') || '1') || 1);
+  const limit  = Math.max(1, Math.min(100, parseInt(searchParams.get('limit') || '20') || 20));
   const offset = (page - 1) * limit;
 
   // Join profiles with applications table instead of relying on removed columns
@@ -108,17 +121,19 @@ export const GET = apiHandler(async (req: NextRequest) => {
      LEFT JOIN sections sec ON e.section_id = sec.section_id
      ${where}
      ORDER BY p.created_at DESC
-     LIMIT ? OFFSET ?`,
-    [...params, limit, offset]
+     LIMIT ${limit} OFFSET ${offset}`,
+    params
   );
 
-  const [{ total }] = await query<any[]>(
+  const totalRes = await query<any[]>(
     `SELECT COUNT(*) AS total 
      FROM profiles p
-     LEFT JOIN applications app ON app.profile_id = p.profile_id
+     JOIN applications app ON app.profile_id = p.profile_id
      ${where}`,
     params
   );
+
+  const total = Number(totalRes[0]?.total || 0);
 
   return json({ success: true, data: { applicants, total, page, limit } });
 });

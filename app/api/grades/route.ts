@@ -5,12 +5,12 @@ import { computeRemarks } from '@/lib/auth';
 import { z } from 'zod';
 
 const UpsertGradeSchema = z.object({
-  offering_id: z.number(),
-  enrollment_id: z.number(),
-  prelim_grade:  z.number().min(0).max(100).nullable().optional(),
-  midterm_grade: z.number().min(0).max(100).nullable().optional(),
-  semi_final_grade: z.number().min(0).max(100).nullable().optional(),
-  final_grade:   z.number().min(0).max(100).nullable().optional(),
+  offering_id: z.coerce.number(),
+  enrollment_id: z.coerce.number(),
+  prelim_grade:  z.coerce.number().min(0).max(100).nullable().optional(),
+  midterm_grade: z.coerce.number().min(0).max(100).nullable().optional(),
+  semi_final_grade: z.coerce.number().min(0).max(100).nullable().optional(),
+  final_grade:   z.coerce.number().min(0).max(100).nullable().optional(),
 });
 
 export const POST = apiHandler(async (req: NextRequest) => {

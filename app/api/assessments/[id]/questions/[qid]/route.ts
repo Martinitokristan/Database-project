@@ -26,14 +26,13 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
       [question_text, question_type, points || 1, case_sensitive ? 1 : 0, qid, id]
     );
 
-    await conn.execute('DELETE FROM assessment_answers WHERE question_id = ?', [qid]);
     await conn.execute('DELETE FROM assessment_options WHERE question_id = ?', [qid]);
 
     if (question_type === 'Identification' && Array.isArray(answers)) {
       for (const ans of answers) {
         if (ans?.trim()) {
           await conn.execute(
-            'INSERT INTO assessment_answers (question_id, answer_text) VALUES (?, ?)',
+            'INSERT INTO assessment_options (question_id, option_text, is_correct) VALUES (?, ?, 1)',
             [qid, ans.trim()]
           );
         }

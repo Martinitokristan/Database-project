@@ -66,7 +66,17 @@ export function StudentDetailsModal({
         date_of_birth:  student.date_of_birth
           ? new Date(student.date_of_birth).toISOString().split('T')[0]
           : '',
-        address:    student.address || '',
+        address: (() => {
+          if (!student.address) return '';
+          try {
+            const parsed = JSON.parse(student.address);
+            const curr = parsed.current;
+            if (!curr) return student.address;
+            return [curr.streetBarangay, curr.city, curr.province, curr.postalCode].filter(Boolean).join(', ');
+          } catch (e) {
+            return student.address;
+          }
+        })(),
         year_level: student.year_level || '',
         section_id: student.section_id?.toString() || 'none',
       });

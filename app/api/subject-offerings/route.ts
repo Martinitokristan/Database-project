@@ -55,9 +55,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
             p.first_name AS instructor_first, p.last_name AS instructor_last,
             COUNT(DISTINCT e.enrollment_id) AS enrolled_count,
             COUNT(DISTINCT sch.schedule_id) AS schedule_count,
-            GROUP_CONCAT(DISTINCT CONCAT(sch.day_of_week, ' ', TIME_FORMAT(sch.start_time, '%H:%i'), '-', TIME_FORMAT(sch.end_time, '%H:%i')) SEPARATOR ', ') as schedule_details,
-            MIN(sch.start_date) as start_date,
-            MAX(sch.end_date) as end_date
+            GROUP_CONCAT(DISTINCT CONCAT(sch.day_of_week, ' ', TIME_FORMAT(sch.start_time, '%H:%i'), '-', TIME_FORMAT(sch.end_time, '%H:%i')) SEPARATOR ', ') as schedule_details
      FROM subject_offerings so
      JOIN subjects sub ON so.subject_id = sub.subject_id
      JOIN sections sec ON so.section_id = sec.section_id
@@ -67,7 +65,11 @@ export const GET = apiHandler(async (req: NextRequest) => {
      LEFT JOIN enrollments e ON e.section_id = sec.section_id AND e.status = 'Enrolled'
      LEFT JOIN schedules sch ON sch.offering_id = so.offering_id
      ${where}
-     GROUP BY so.offering_id
+     GROUP BY so.offering_id, sub.code, sub.title, sub.credit_units, sub.subject_type,
+              sec.section_name, sec.capacity, sec.semester_id, sec.is_archived,
+              sem.school_year, sem.term, sem.status,
+              p.first_name, p.last_name,
+              so.subject_id, so.section_id, so.instructor_id, so.created_at
      ORDER BY sem.school_year DESC, sec.section_name, sub.title`,
     params
   );

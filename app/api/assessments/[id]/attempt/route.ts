@@ -89,16 +89,16 @@ export const POST = apiHandler(async (req: NextRequest, ctx: { params: Promise<{
     throw { status: 403, message: 'You are not enabled for this assessment.' };
   }
 
-  // Use MySQL NOW() for consistent timezone handling
-  const [[{ now }]] = await pool.execute('SELECT NOW() as now') as any;
-  console.log('[Attempt] Time check - now:', now, 'open_at:', assessment.open_at, 'close_at:', assessment.close_at);
+  // Use JS Date for consistent timezone handling with the list view
+  const now = new Date();
+  console.log('[Attempt] Time check - now:', now.toLocaleString(), 'open_at:', assessment.open_at, 'close_at:', assessment.close_at);
 
   if (!assessment.is_open) {
-    if (assessment.open_at && assessment.open_at > now) {
+    if (assessment.open_at && new Date(assessment.open_at) > now) {
       console.log('[Attempt] Blocked - not opened yet');
-      throw { status: 403, message: `Assessment opens at ${assessment.open_at}. Current server time: ${now}` };
+      throw { status: 403, message: `Assessment opens at ${new Date(assessment.open_at).toLocaleString()}. Current server time: ${now.toLocaleString()}` };
     }
-    if (assessment.close_at && assessment.close_at < now) {
+    if (assessment.close_at && new Date(assessment.close_at) < now) {
       console.log('[Attempt] Blocked - already closed');
       throw { status: 403, message: 'Assessment is closed.' };
     }
@@ -111,15 +111,13 @@ export const POST = apiHandler(async (req: NextRequest, ctx: { params: Promise<{
   ) as any;
   if (existing.length) throw { status: 409, message: 'You already have an in-progress attempt.' };
 
-  if (!assessment.allow_retakes) {
-    const [done] = await pool.execute(
-      `SELECT COUNT(*) AS cnt FROM assessment_attempts
-       WHERE assessment_id = ? AND user_id = ? AND status != 'InProgress'`,
-      [id, payload.user_id]
-    ) as any;
-    if (done[0].cnt >= assessment.max_attempts) {
-      throw { status: 409, message: 'You have reached the maximum number of attempts.' };
-    }
+  const [done] = await pool.execute(
+    `SELECT COUNT(*) AS cnt FROM assessment_attempts
+     WHERE assessment_id = ? AND user_id = ? AND status != 'InProgress'`,
+    [id, payload.user_id]
+  ) as any;
+  if (done[0].cnt >= assessment.max_attempts) {
+    throw { status: 409, message: 'You have reached the maximum number of attempts.' };
   }
 
   const [prevAttempts] = await pool.execute(
