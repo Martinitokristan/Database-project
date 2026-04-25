@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
     const s = await query('DESCRIBE schedules');
     const g = await query('DESCRIBE grades');
     const so = await query('DESCRIBE subject_offerings');
-    return json({ success: true, assessments: a, schedules: s, grades: g, subject_offerings: so });
+    return json({ success: true, data: { assessments: a, schedules: s, grades: g, subject_offerings: so } });
   } catch (err: any) {
     return json({ success: false, message: err.message });
   }
