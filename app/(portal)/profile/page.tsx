@@ -27,6 +27,7 @@ const schema = z.object({
   address:       z.string().min(5, 'Required'),
   gender:        z.enum(['Male', 'Female', 'Other']),
   date_of_birth: z.string().min(1, 'Required'),
+  age:           z.number().optional(),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -39,7 +40,7 @@ export default function ProfilePage() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, setValue, reset, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
 
@@ -58,10 +59,27 @@ export default function ProfilePage() {
         address:       res.data.address,
         gender:        res.data.gender,
         date_of_birth: res.data.date_of_birth?.slice(0, 10),
+        age:           res.data.age,
       });
     }
     setLoading(false);
   }
+
+  const dob = watch('date_of_birth');
+  useEffect(() => {
+    if (dob) {
+      const birthDate = new Date(dob);
+      if (!isNaN(birthDate.getTime())) {
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+        setValue('age', age);
+      }
+    }
+  }, [dob, setValue]);
 
   useEffect(() => { loadProfile(); }, [user?.user_id]);
 
@@ -187,6 +205,7 @@ export default function ProfilePage() {
                 { icon: MapPin,   label: 'Address',       value: profile?.address },
                 { icon: User,     label: 'Gender',        value: profile?.gender },
                 { icon: Calendar, label: 'Date of Birth', value: profile?.date_of_birth?.slice(0, 10) },
+                { icon: User,     label: 'Age',           value: profile?.age },
               ].map(({ icon: Icon, label, value }) => (
                 <div key={label} className="flex gap-3">
                   <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
@@ -245,6 +264,10 @@ export default function ProfilePage() {
                   <Label>Date of Birth</Label>
                   <Input type="date" {...register('date_of_birth')} />
                   {errors.date_of_birth && <p className="text-xs text-destructive">{errors.date_of_birth.message}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Age</Label>
+                  <Input type="number" {...register('age', { valueAsNumber: true })} readOnly className="bg-muted" />
                 </div>
               </div>
 

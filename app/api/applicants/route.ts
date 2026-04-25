@@ -29,6 +29,7 @@ const CreateApplicantSchema = z.object({
   phone:           z.string().min(1).max(11),
   gender:          z.enum(['Male', 'Female', 'Other']),
   date_of_birth:   z.string().min(1),
+  age:             z.number().int().min(0).optional(),
 });
 
 export const POST = apiHandler(async (req: NextRequest) => {
@@ -40,7 +41,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
   const {
     email, course_id, first_name, middle_name, last_name, suffix,
-    current_address, home_address, phone, gender, date_of_birth,
+    current_address, home_address, phone, gender, date_of_birth, age,
   } = parsed.data;
 
   const currentFormat = [current_address.streetBarangay, current_address.city, current_address.province, current_address.postalCode].filter(Boolean).join(', ');
@@ -63,9 +64,9 @@ export const POST = apiHandler(async (req: NextRequest) => {
   try {
     const newProfileId = await transaction(async (conn) => {
       const [result] = await conn.execute(
-        `INSERT INTO profiles (user_id, first_name, middle_name, last_name, suffix, address, phone, gender, date_of_birth, personal_email, course_id)
-         VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [first_name, middle_name ?? null, last_name, suffix ?? null, addressStr, phone, gender, date_of_birth, email, course_id]
+        `INSERT INTO profiles (user_id, first_name, middle_name, last_name, suffix, address, phone, gender, date_of_birth, age, personal_email, course_id)
+         VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [first_name, middle_name ?? null, last_name, suffix ?? null, addressStr, phone, gender, date_of_birth, age ?? null, email, course_id]
       );
       
       const insertId = (result as any).insertId;

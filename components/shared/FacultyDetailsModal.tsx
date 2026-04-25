@@ -23,6 +23,7 @@ const editSchema = z.object({
   phone:          z.string().length(11, 'Must be 11 digits'),
   gender:         z.enum(['Male', 'Female', 'Other']),
   date_of_birth:  z.string().min(1, 'Required'),
+  age:            z.number().optional(),
   address:        z.string().min(5, 'Required'),
 });
 
@@ -66,10 +67,27 @@ export function FacultyDetailsModal({
         date_of_birth:  faculty.date_of_birth
           ? new Date(faculty.date_of_birth).toISOString().split('T')[0]
           : '',
+        age: faculty.age || undefined,
         address:    faculty.address || '',
       });
     }
   }, [faculty, reset]);
+
+  const dob = watch('date_of_birth');
+  useEffect(() => {
+    if (dob) {
+      const birthDate = new Date(dob);
+      if (!isNaN(birthDate.getTime())) {
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+        setValue('age', age);
+      }
+    }
+  }, [dob, setValue]);
 
   if (!faculty) return null;
 
@@ -202,6 +220,12 @@ export function FacultyDetailsModal({
                 {errors.date_of_birth && (
                   <p className="text-xs text-red-500">{errors.date_of_birth.message}</p>
                 )}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Age
+                </Label>
+                <Input type="number" {...register('age', { valueAsNumber: true })} readOnly className="h-9 text-sm bg-slate-50 text-slate-500" />
               </div>
             </div>
 

@@ -29,6 +29,7 @@ const schema = z.object({
   personal_email: z.string().email(),
   gender:        z.enum(['Male', 'Female', 'Other']),
   date_of_birth: z.string().min(1),
+  age:           z.number().optional(),
   phone:         z.string().length(11, 'Must be 11 digits'),
   address:       z.string().min(5),
   temp_password: z.string().min(7, 'Required (4 letters + 3 numbers)'),
@@ -52,6 +53,22 @@ export default function FacultyPage() {
 
   const firstName = watch('first_name');
   const lastName  = watch('last_name');
+  const dob       = watch('date_of_birth');
+
+  useEffect(() => {
+    if (dob) {
+      const birthDate = new Date(dob);
+      if (!isNaN(birthDate.getTime())) {
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+        setValue('age', age);
+      }
+    }
+  }, [dob, setValue]);
 
   useEffect(() => { register('gender'); }, [register]);
 
@@ -65,7 +82,7 @@ export default function FacultyPage() {
     for (let i = 0; i < 3; i++) randNums += nums.charAt(Math.floor(Math.random() * nums.length));
     
     const suffix = `${randLetters}${randNums}`;
-    const generatedEmail = `${firstName.toLowerCase()}.${lastName.toLowerCase()}.${suffix}@acadtrack.edu`.replace(/\s+/g, '');
+    const generatedEmail = `${firstName.toLowerCase()}.${lastName.toLowerCase()}@acadtrack.edu`.replace(/\s+/g, '');
     const generatedPass  = suffix.toUpperCase(); // Or follow the exact 4+3 rule for password too
 
     setValue('email', generatedEmail);
@@ -236,6 +253,7 @@ export default function FacultyPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5"><Label className="text-[11px] font-bold uppercase tracking-wider">Date of Birth</Label><Input type="date" {...register('date_of_birth')} /></div>
+                <div className="space-y-1.5"><Label className="text-[11px] font-bold uppercase tracking-wider">Age</Label><Input type="number" {...register('age', { valueAsNumber: true })} readOnly className="bg-muted" /></div>
               </div>
               <div className="space-y-1.5"><Label className="text-[11px] font-bold uppercase tracking-wider">Phone Number</Label><Input {...register('phone')} maxLength={11} placeholder="09XXXXXXXXX" />{errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}</div>
               <div className="space-y-1.5"><Label className="text-[11px] font-bold uppercase tracking-wider">Physical Address</Label><Input {...register('address')} /></div>

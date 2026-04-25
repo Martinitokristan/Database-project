@@ -13,9 +13,10 @@ const CreateFacultySchema = z.object({
   personal_email: z.string().email(),
   gender:         z.enum(['Male', 'Female', 'Other']),
   date_of_birth:  z.string().min(1),
+  age:            z.number().int().min(0).nullable().optional(),
   phone:          z.string().length(11, 'Phone must be exactly 11 digits'),
   address:        z.string().min(1),
-  temp_password:  z.string().min(8),
+  temp_password:  z.string().min(7),
 });
 
 export const POST = apiHandler(async (req: NextRequest) => {
@@ -23,12 +24,13 @@ export const POST = apiHandler(async (req: NextRequest) => {
   const body   = await req.json();
   const parsed = CreateFacultySchema.safeParse(body);
   if (!parsed.success) {
+    console.error('[FacultyAPI] Validation failed:', JSON.stringify(parsed.error.flatten(), null, 2));
     return json({ success: false, message: 'Validation failed.', data: parsed.error.flatten() }, 422);
   }
 
   const {
     first_name, middle_name, last_name, email,
-    personal_email, gender, date_of_birth, phone,
+    personal_email, gender, date_of_birth, age, phone,
     address, temp_password
   } = parsed.data;
 
@@ -50,9 +52,9 @@ export const POST = apiHandler(async (req: NextRequest) => {
     );
 
     await conn.execute(
-      `INSERT INTO profiles (user_id, first_name, middle_name, last_name, address, phone, gender, date_of_birth, personal_email)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [newUserId, first_name, middle_name ?? null, last_name, address, phone, gender, date_of_birth, personal_email]
+      `INSERT INTO profiles (user_id, first_name, middle_name, last_name, address, phone, gender, date_of_birth, age, personal_email)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [newUserId, first_name, middle_name ?? null, last_name, address, phone, gender, date_of_birth, age ?? null, personal_email]
     );
 
     return { user_id: newUserId };

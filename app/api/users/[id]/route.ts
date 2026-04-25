@@ -10,6 +10,7 @@ const UpdateProfileSchema = z.object({
   suffix:        z.string().nullable().optional(),
   gender:        z.enum(['Male', 'Female', 'Other']).optional(),
   date_of_birth: z.string().optional(),
+  age:           z.number().int().min(0).optional(),
   phone:         z.string().min(7).optional(),
   address:       z.string().min(5).optional(),
   year_level:    z.enum(['1st Year', '2nd Year', '3rd Year', '4th Year', 'Masteral', 'Doctorate', 'Irregular']).nullable().optional(),

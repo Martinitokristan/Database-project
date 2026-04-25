@@ -12,6 +12,7 @@ const UpdateProfileSchema = z.object({
   phone:         z.string().min(1).max(20).optional(),
   gender:        z.enum(['Male', 'Female', 'Other']).optional(),
   date_of_birth: z.string().optional(),
+  age:           z.number().int().min(0).nullable().optional(),
 });
 
 export const GET = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {

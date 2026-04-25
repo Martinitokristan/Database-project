@@ -28,6 +28,7 @@ const schema = z.object({
   course_id: z.string().min(1, 'Please select a course'),
   gender: z.string().min(1, 'Gender is required'),
   date_of_birth: z.string().min(1, 'Date of birth is required'),
+  age: z.number().optional(),
   phone: z.string().min(1, 'Phone number is required').max(11, 'Maximum 11 digits').regex(/^\d+$/, 'Numbers only'),
   // Current address
   current_province: z.string().min(1, 'Province is required'),
@@ -140,6 +141,22 @@ export default function ApplyPage() {
     }
   }, [sameAsCurrentAddr, currentProvince, currentCity, currentPostalCode, currentStreetBarangay, setValue]);
 
+  const dob = watch('date_of_birth');
+  useEffect(() => {
+    if (dob) {
+      const birthDate = new Date(dob);
+      if (!isNaN(birthDate.getTime())) {
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+        setValue('age', age);
+      }
+    }
+  }, [dob, setValue]);
+
   // Phone number input handler
   const handlePhoneInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
@@ -159,6 +176,7 @@ export default function ApplyPage() {
         course_id: Number(data.course_id),
         gender: data.gender,
         date_of_birth: data.date_of_birth,
+        age: data.age,
         phone: data.phone,
         current_address: {
           province: data.current_province,
@@ -273,6 +291,10 @@ export default function ApplyPage() {
                   <Label>Date of Birth <span className="text-destructive">*</span></Label>
                   <Input type="date" {...register('date_of_birth')} />
                   {errors.date_of_birth && <p className="text-xs text-destructive">{errors.date_of_birth.message}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Age</Label>
+                  <Input type="number" {...register('age', { valueAsNumber: true })} readOnly className="bg-muted" />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Course <span className="text-destructive">*</span></Label>
