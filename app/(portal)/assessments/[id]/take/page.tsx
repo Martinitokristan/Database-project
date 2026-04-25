@@ -592,7 +592,7 @@ function TakeUI({ assessmentId, userId }: { assessmentId: number; userId: string
 
   return (
     <>
-      {phase !== 'taking' && phase !== 'review' && phase !== 'submitted' && phase !== 'start' && <LoadingSpinner />}
+      {phase === 'loading' && <LoadingSpinner />}
       <ConfirmDialog
         open={showSubmitConfirm}
         onOpenChange={setShowSubmitConfirm}
