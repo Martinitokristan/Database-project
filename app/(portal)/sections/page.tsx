@@ -11,7 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -20,17 +20,20 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { sectionService } from '@/services/sectionService';
 import { subjectService } from '@/services/subjectService';
 import { semesterService } from '@/services/semesterService';
+import { courseService } from '@/services/courseService';
+import { departmentService } from '@/services/departmentService';
 import { toast } from 'sonner';
-import { BookOpen, X, Pencil, Mail, Calendar, Clock, MapPin, Users, Loader2, Plus, ChevronDown, ChevronRight, Eye } from 'lucide-react';
+import { BookOpen, X, Pencil, Mail, Calendar, Clock, MapPin, Users, Loader2, Plus, ChevronDown, ChevronRight, Eye, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 const schema = z.object({
-  subject_id:    z.string().min(1, 'Select subject'),
+  subject_id: z.string().min(1, 'Select subject'),
   instructor_id: z.string().min(1, 'Select instructor'),
-  semester_id:   z.string().min(1, 'Select semester'),
-  section_name:  z.string().min(1),
-  capacity:      z.string().min(1),
+  semester_id: z.string().min(1, 'Select semester'),
+  section_name: z.string().min(1),
+  capacity: z.string().min(1),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -40,11 +43,11 @@ function groupBySemester(sections: any[]) {
   for (const s of sections) {
     const key = String(s.semester_id);
     if (!map.has(key)) {
-      map.set(key, { 
-        name: `${s.term} ${s.school_year}`, 
-        semester_id: s.semester_id, 
+      map.set(key, {
+        name: `${s.term} ${s.school_year}`,
+        semester_id: s.semester_id,
         is_active: s.semester_status === 'Active',
-        sections: [] 
+        sections: []
       });
     }
     map.get(key)!.sections.push(s);
@@ -59,50 +62,76 @@ function groupBySemester(sections: any[]) {
 
 // ─── Admin Accordion View ─────────────────────────────────────────────────────
 function AdminSections() {
-  const [sections, setSections]   = useState<any[]>([]);
+  const [sections, setSections] = useState<any[]>([]);
   const [semesters, setSemesters] = useState<any[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [open, setOpen]           = useState(false);
-  const [saving, setSaving]       = useState(false);
-  // Track which semester accordions are expanded (key = semester_id string)
-  const [expanded, setExpanded]   = useState<Set<string>>(new Set());
-  const [editTarget, setEditTarget] = useState<any>(null);
-  const [editing, setEditing]     = useState(false);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // Section Creation Form no longer requires subject or instructor immediately
+  // Filters
+  const [courseFilter, setCourseFilter] = useState<string>('all');
+  const [deptFilter, setDeptFilter]     = useState<string>('all');
+  const [yearFilter, setYearFilter] = useState<string>('all');
+  const [semesterFilter, setSemesterFilter] = useState<string>('all');
+
+  // Track which semester accordions are expanded (key = semester_id string)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [editTarget, setEditTarget] = useState<any>(null);
+  const [editing, setEditing] = useState(false);
+
+  // Section Creation Form
   const { register, handleSubmit, setValue, reset, watch, formState: { errors } } = useForm<{
     section_name: string;
-    year_level:   string;
-    semester_id:  string;
+    year_level: string;
+    semester_id: string;
+    course_id: string;
     capacity: string;
   }>({
     defaultValues: { capacity: '40', year_level: '1st Year' },
   });
   const yearLevelValue = watch('year_level');
   const semesterValue = watch('semester_id');
+  const courseValue = watch('course_id');
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [sr, semr] = await Promise.all([
-      sectionService.list(),
+    const params: any = {};
+    if (semesterFilter !== 'all') params.semester_id = Number(semesterFilter);
+    if (courseFilter !== 'all') params.course_id = Number(courseFilter);
+    if (deptFilter !== 'all')   params.dept_id   = Number(deptFilter);
+
+    const [sr, semr, cr, dr] = await Promise.all([
+      sectionService.list(params),
       semesterService.list(),
+      courseService.list(),
+      departmentService.list(),
     ]);
-    if (sr.success)   setSections(sr.data ?? []);
+    if (sr.success) setSections(sr.data ?? []);
     if (semr.success) setSemesters(semr.data ?? []);
+    if (cr.success) setCourses(cr.data ?? []);
+    if (dr.success) setDepartments(dr.data ?? []);
     setLoading(false);
-  }, []);
+  }, [courseFilter, deptFilter, semesterFilter]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  // Auto-expand all groups on first load
+  // Client-side year level filtering since the year filter is a string
+  const filteredSections = sections.filter(s => {
+    if (yearFilter === 'all') return true;
+    return s.year_level === yearFilter;
+  });
+
+  // Auto-expand all groups on first load or when sections change
   useEffect(() => {
-    if (sections.length > 0) {
-      const ids = new Set(sections.map((s: any) => String(s.semester_id)));
+    if (filteredSections.length > 0) {
+      const ids = new Set(filteredSections.map((s: any) => String(s.semester_id)));
       setExpanded(ids);
     }
-  }, [sections]);
+  }, [sections, yearFilter]);
 
   function toggleGroup(key: string) {
     setExpanded(prev => {
@@ -113,26 +142,27 @@ function AdminSections() {
   }
 
   async function onSubmit(data: any) {
-    if (!data.semester_id || !data.section_name || !data.capacity) {
-      toast.error('Please fill in all fields.');
+    if (!data.semester_id || !data.section_name || !data.capacity || !data.course_id) {
+      toast.error('Please fill in all required fields.');
       return;
     }
     setSaving(true);
     const payload = {
       semester_id: Number(data.semester_id),
+      course_id: Number(data.course_id),
       section_name: data.section_name,
       year_level: data.year_level,
       capacity: Number(data.capacity),
     };
-    const res = editTarget 
+    const res = editTarget
       ? await sectionService.update(editTarget.section_id, payload)
       : await sectionService.create(payload);
 
     setSaving(false);
     if (!res.success) { toast.error(res.message); return; }
-    toast.success(editTarget ? 'Section updated.' : 'Section created.'); 
-    reset({ capacity: '40', year_level: '1st Year' }); 
-    setOpen(false); 
+    toast.success(editTarget ? 'Section updated.' : 'Section created.');
+    reset({ capacity: '40', year_level: '1st Year' });
+    setOpen(false);
     setEditTarget(null);
     load();
   }
@@ -142,23 +172,131 @@ function AdminSections() {
     reset({
       section_name: s.section_name,
       semester_id: String(s.semester_id),
+      course_id: String(s.course_id),
       year_level: s.year_level || '1st Year',
       capacity: String(s.capacity),
     });
     setOpen(true);
   }
 
-  const grouped = groupBySemester(sections);
+  const grouped = groupBySemester(filteredSections);
 
   return (
     <div>
       <PageHeader
         title="Sections (Cohorts)"
-        description={`${sections.length} section${sections.length !== 1 ? 's' : ''} organized by semester.`}
+        description={`${filteredSections.length} section${filteredSections.length !== 1 ? 's' : ''} organized by semester.`}
         action={
-          <Button onClick={() => { reset({ capacity: '40' }); setOpen(true); }}>
-            <Plus className="mr-2 h-4 w-4" />Add Section
-          </Button>
+          <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-2 shadow-sm">
+                  <Filter className="h-4 w-4" /> Filters
+                  {(courseFilter !== 'all' || deptFilter !== 'all' || yearFilter !== 'all' || semesterFilter !== 'all') && (
+                    <Badge className="ml-1 h-5 w-5 p-0 flex items-center justify-center rounded-full text-[10px]">
+                      {(courseFilter !== 'all' ? 1 : 0) + (deptFilter !== 'all' ? 1 : 0) + (yearFilter !== 'all' ? 1 : 0) + (semesterFilter !== 'all' ? 1 : 0)}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-4" align="end">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-sm">Filter Sections</h4>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 text-xs text-primary"
+                      onClick={() => {
+                        setCourseFilter('all');
+                        setDeptFilter('all');
+                        setYearFilter('all');
+                        setSemesterFilter('all');
+                      }}
+                    >
+                      Clear all
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs">Semester</Label>
+                    <Select value={semesterFilter} onValueChange={setSemesterFilter}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="All Semesters" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Semesters</SelectItem>
+                        {semesters.map((s: any) => (
+                          <SelectItem key={s.semester_id} value={String(s.semester_id)}>
+                            {s.term} {s.school_year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs">Department</Label>
+                    <Select value={deptFilter} onValueChange={setDeptFilter}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="All Departments" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Departments</SelectItem>
+                        {departments.map((d: any) => (
+                          <SelectItem key={d.dept_id} value={String(d.dept_id)}>
+                            {d.department_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs">Course</Label>
+                    <Select value={courseFilter} onValueChange={setCourseFilter}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="All Courses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Courses</SelectItem>
+                        {courses
+                          .filter(c => deptFilter === 'all' || String(c.dept_id) === deptFilter)
+                          .map((c: any) => (
+                          <SelectItem key={c.course_id} value={String(c.course_id)}>
+                            {c.course_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs">Year Level</Label>
+                    <Select value={yearFilter} onValueChange={setYearFilter}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="All Year Levels" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Year Levels</SelectItem>
+                        <SelectItem value="1st Year">1st Year</SelectItem>
+                        <SelectItem value="2nd Year">2nd Year</SelectItem>
+                        <SelectItem value="3rd Year">3rd Year</SelectItem>
+                        <SelectItem value="4th Year">4th Year</SelectItem>
+                        <SelectItem value="Masteral">Masteral</SelectItem>
+                        <SelectItem value="Doctorate">Doctorate</SelectItem>
+                        <SelectItem value="Irregular">Irregular</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <Button onClick={() => { reset({ capacity: '40' }); setOpen(true); }}>
+              <Plus className="mr-2 h-4 w-4" />Add Section
+            </Button>
+          </div>
         }
       />
 
@@ -211,19 +349,22 @@ function AdminSections() {
                       <div className="text-center">Enrolled</div>
                       <div className="w-[120px]" />
                     </div>
-                    
+
                     <div className="divide-y">
                       {group.sections.map(s => {
                         const full = Number(s.enrolled_count) >= s.capacity;
                         return (
-                          <div 
-                            key={s.section_id} 
+                          <div
+                            key={s.section_id}
                             className="group flex flex-col md:grid md:grid-cols-[2fr_120px_100px_100px_60px] gap-4 px-6 py-4 items-center hover:bg-muted/50 transition-all duration-200"
                           >
                             {/* Section Name */}
                             <div className="w-full md:w-auto flex items-center justify-between md:block">
                               <span className="md:hidden text-xs font-semibold uppercase text-muted-foreground">Section</span>
-                              <span className="font-bold text-base md:text-sm text-primary">{s.section_name}</span>
+                              <div className="flex flex-col">
+                                <span className="font-bold text-base md:text-sm text-primary">{s.section_name}</span>
+                                {s.course_name && <span className="text-[10px] text-muted-foreground truncate max-w-[150px]">{s.course_name}</span>}
+                              </div>
                             </div>
 
                             {/* Year Level */}
@@ -243,8 +384,8 @@ function AdminSections() {
                             {/* Enrolled */}
                             <div className="w-full md:w-auto flex items-center justify-between md:block text-center">
                               <span className="md:hidden text-xs font-semibold uppercase text-muted-foreground">Enrolled</span>
-                              <Badge 
-                                variant="outline" 
+                              <Badge
+                                variant="outline"
                                 className={cn(
                                   "font-bold transition-all",
                                   full ? "border-destructive text-destructive bg-destructive/5" : "border-primary/20 text-primary bg-primary/5"
@@ -255,9 +396,9 @@ function AdminSections() {
 
                             {/* Actions */}
                             <div className="w-full md:w-auto flex justify-end gap-1.5">
-                              <Button 
-                                size="sm" 
-                                variant="ghost" 
+                              <Button
+                                size="sm"
+                                variant="ghost"
                                 className="h-8 w-8 p-0 hover:bg-indigo-50 hover:text-indigo-600"
                                 onClick={() => openEdit(s)}
                               >
@@ -312,6 +453,20 @@ function AdminSections() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-1.5">
+                <Label>Course</Label>
+                <Select value={courseValue} onValueChange={v => setValue('course_id', v)}>
+                  <SelectTrigger><SelectValue placeholder="Select course" /></SelectTrigger>
+                  <SelectContent>
+                    {courses.map((c: any) => (
+                      <SelectItem key={c.course_id} value={String(c.course_id)}>
+                        {c.course_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-1.5">
                 <Label>Year Level</Label>
                 <Select value={yearLevelValue} onValueChange={v => setValue('year_level', v)}>
@@ -353,9 +508,9 @@ function AdminSections() {
 // ─── Faculty Card View ───────────────────────────────────────────────────────
 function FacultySections() {
   const [schedules, setSchedules] = useState<any[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const [loading, setLoading] = useState(true);
   const [selectedSection, setSelectedSection] = useState<any>(null);
-  const [students, setStudents]   = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
 
   useEffect(() => {
@@ -404,11 +559,11 @@ function FacultySections() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="My Schedule" 
-        description="View your assigned classes and student enrollments." 
+      <PageHeader
+        title="My Schedule"
+        description="View your assigned classes and student enrollments."
       />
-      
+
       {schedules.length === 0 ? (
         <EmptyState title="No schedules found" description="You have not been assigned to any class schedules yet." />
       ) : (
@@ -474,8 +629,8 @@ function FacultySections() {
                             Refresh Student List
                           </Button>
                         </div>
-                        <Button 
-                          className="w-full justify-start gap-2" 
+                        <Button
+                          className="w-full justify-start gap-2"
                           variant="secondary"
                           onClick={() => viewStudents(s)}
                         >
@@ -500,7 +655,7 @@ function FacultySections() {
               {selectedSection?.subject_title} ({selectedSection?.subject_code})
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="py-2">
             {loadingStudents ? (
               <div className="h-32 flex items-center justify-center"><Loader2 className="animate-spin" /></div>
@@ -535,7 +690,7 @@ function FacultySections() {
               </div>
             )}
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setSelectedSection(null)}>Close</Button>
           </DialogFooter>
@@ -548,7 +703,7 @@ export default function SectionsPage() {
   const { user, isLoading } = useAuth();
 
   if (isLoading) return <LoadingSpinner />;
-  
+
   if (user?.role_name === 'Admin') {
     return <AdminSections />;
   }

@@ -23,14 +23,17 @@ import { semesterService } from '@/services/semesterService';
 import { sectionService } from '@/services/sectionService';
 import { profileService } from '@/services/profileService';
 import { subjectService } from '@/services/subjectService';
+import { courseService } from '@/services/courseService';
 import { userService } from '@/services/userService';
+import { departmentService } from '@/services/departmentService';
 import { toast } from 'sonner';
 import {
   CalendarRange, Clock, User, Star,
   CheckCircle, XCircle, AlertCircle,
   Plus, Pencil, Trash2, Loader2, ChevronDown, ChevronRight,
-  BookOpen, BookMarked, Users, FileDown, Bell, Eye, Archive, Layers,
+  BookOpen, BookMarked, Users, FileDown, Bell, Eye, Archive, Layers, Filter,
 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 /* ─── Zod schema for admin form ─────────────────────────── */
 const schema = z.object({
@@ -110,6 +113,14 @@ function AdminSemestersView() {
   const [notifyDone, setNotifyDone]     = useState<{ sent: number; faculty: string[] } | null>(null);
   const [renamingSection, setRenamingSection] = useState(false);
   const [renameValue, setRenameValue]         = useState('');
+  
+  // Filters for Section Management tab
+  const [courseFilter, setCourseFilter] = useState<string>('all');
+  const [deptFilter, setDeptFilter]     = useState<string>('all');
+  const [yearFilter, setYearFilter]     = useState<string>('all');
+  const [semesterFilter, setSemesterFilter] = useState<string>('all');
+  const [courses, setCourses]           = useState<any[]>([]);
+  const [departments, setDepartments]   = useState<any[]>([]);
 
   const { register, handleSubmit, setValue, reset, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -119,18 +130,27 @@ function AdminSemestersView() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [semRes, secRes, subRes, facRes] = await Promise.all([
+    const params: any = {};
+    if (courseFilter !== 'all')   params.course_id   = Number(courseFilter);
+    if (deptFilter !== 'all')     params.dept_id     = Number(deptFilter);
+    if (semesterFilter !== 'all') params.semester_id = Number(semesterFilter);
+
+    const [semRes, secRes, subRes, facRes, crRes, drRes] = await Promise.all([
       semesterService.list(),
-      sectionService.list(),
+      sectionService.list(params),
       subjectService.list(),
-      userService.list({ role: 'Faculty', limit: 100 })
+      userService.list({ role: 'Faculty', limit: 100 }),
+      courseService.list(),
+      departmentService.list()
     ]);
     if (semRes.success) setSemesters(semRes.data ?? []);
     if (secRes.success) setAllSections(secRes.data ?? []);
     if (subRes.success) setSubjects(subRes.data ?? []);
     if (facRes.success) setFaculty(facRes.data?.users ?? []);
+    if (crRes.success)  setCourses(crRes.data ?? []);
+    if (drRes.success)  setDepartments(drRes.data ?? []);
     setLoading(false);
-  }, []);
+  }, [courseFilter, deptFilter, semesterFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -210,9 +230,111 @@ function AdminSemestersView() {
               <Plus className="mr-2 h-4 w-4" />Add Semester
             </Button>
           ) : (
-            <Button onClick={() => setAddSectionOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 shadow-md">
-              <Plus className="mr-2 h-4 w-4" />Add Section
-            </Button>
+            <div className="flex items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="gap-2 shadow-sm">
+                    <Filter className="h-4 w-4" /> Filters
+                    {(courseFilter !== 'all' || deptFilter !== 'all' || yearFilter !== 'all' || semesterFilter !== 'all') && (
+                      <Badge className="ml-1 h-5 w-5 p-0 flex items-center justify-center rounded-full text-[10px]">
+                        {(courseFilter !== 'all' ? 1 : 0) + (deptFilter !== 'all' ? 1 : 0) + (yearFilter !== 'all' ? 1 : 0) + (semesterFilter !== 'all' ? 1 : 0)}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-4" align="end">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm">Filter Sections</h4>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-auto p-0 text-xs text-primary"
+                        onClick={() => {
+                          setCourseFilter('all');
+                          setDeptFilter('all');
+                          setYearFilter('all');
+                          setSemesterFilter('all');
+                        }}
+                      >
+                        Clear all
+                      </Button>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-xs">Semester</Label>
+                      <Select value={semesterFilter} onValueChange={setSemesterFilter}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="All Semesters" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Semesters</SelectItem>
+                          {semesters.map((s: any) => (
+                            <SelectItem key={s.semester_id} value={String(s.semester_id)}>
+                              {s.term} {s.school_year}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs">Department</Label>
+                      <Select value={deptFilter} onValueChange={setDeptFilter}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="All Departments" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Departments</SelectItem>
+                          {departments.map((d: any) => (
+                            <SelectItem key={d.dept_id} value={String(d.dept_id)}>
+                              {d.department_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs">Course</Label>
+                      <Select value={courseFilter} onValueChange={setCourseFilter}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="All Courses" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Courses</SelectItem>
+                          {courses
+                            .filter(c => deptFilter === 'all' || String(c.dept_id) === deptFilter)
+                            .map((c: any) => (
+                              <SelectItem key={c.course_id} value={String(c.course_id)}>
+                                {c.course_name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs">Year Level</Label>
+                      <Select value={yearFilter} onValueChange={setYearFilter}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="All Year Levels" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Year Levels</SelectItem>
+                          {['1st Year', '2nd Year', '3rd Year', '4th Year', 'Masteral', 'Doctorate', 'Irregular'].map(yl => (
+                            <SelectItem key={yl} value={yl}>{yl}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <Button onClick={() => setAddSectionOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 shadow-md">
+                <Plus className="mr-2 h-4 w-4" />Add Section
+              </Button>
+            </div>
           )
         }
       />
@@ -307,9 +429,14 @@ function AdminSemestersView() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {allSections.map(sec => (
+                    {allSections.filter(s => yearFilter === 'all' || s.year_level === yearFilter).map(sec => (
                       <TableRow key={sec.section_id} className={sec.is_archived ? "opacity-60 bg-muted/20" : ""}>
-                        <TableCell className="font-medium font-mono text-xs">{sec.section_name}</TableCell>
+                        <TableCell className="font-medium font-mono text-xs">
+                          <div className="flex flex-col">
+                            <span>{sec.section_name}</span>
+                            {sec.course_name && <span className="text-[10px] text-muted-foreground truncate max-w-[150px]">{sec.course_name}</span>}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-xs">
                           {sec.enrolled_count} / {sec.capacity}
                         </TableCell>
@@ -356,7 +483,9 @@ function AdminSemestersView() {
             body: JSON.stringify({
               semester_id: Number(fd.get('semester_id')),
               section_name: fd.get('section_name'),
-              capacity: Number(fd.get('capacity') || 40)
+              year_level: fd.get('year_level'),
+              capacity: Number(fd.get('capacity') || 40),
+              course_id: fd.get('course_id') ? Number(fd.get('course_id')) : undefined
             })
           }).then(r => r.json());
 
@@ -385,6 +514,29 @@ function AdminSemestersView() {
           <div className="space-y-2">
             <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Section Name</Label>
             <Input name="section_name" placeholder="e.g., BSIT 1-A" required />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Course (Optional)</Label>
+            <Select name="course_id">
+              <SelectTrigger><SelectValue placeholder="Select course..." /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">None</SelectItem>
+                {courses.map(c => <SelectItem key={c.course_id} value={String(c.course_id)}>{c.course_name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Academic Year Level</Label>
+            <Select name="year_level" required defaultValue="1st Year">
+              <SelectTrigger><SelectValue placeholder="Select year level..." /></SelectTrigger>
+              <SelectContent>
+                {['1st Year', '2nd Year', '3rd Year', '4th Year', 'Masteral', 'Doctorate', 'Irregular'].map(yl => (
+                  <SelectItem key={yl} value={yl}>{yl}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">

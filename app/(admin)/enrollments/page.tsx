@@ -222,11 +222,16 @@ export default function EnrollmentsPage() {
                   <Select value={selectedSection} onValueChange={setSelectedSection}>
                     <SelectTrigger><SelectValue placeholder="Select section to enroll" /></SelectTrigger>
                     <SelectContent>
-                      {sections.map((s: any) => (
-                        <SelectItem key={s.section_id} value={String(s.section_id)}>
-                          {s.section_name} · {s.subject_code} · {s.enrolled_count}/{s.capacity}
-                        </SelectItem>
-                      ))}
+                      {sections
+                        .filter((s: any) => s.course_id === verifyTarget.course_id)
+                        .map((s: any) => (
+                          <SelectItem key={s.section_id} value={String(s.section_id)}>
+                            {s.section_name} · {s.enrolled_count}/{s.capacity}
+                          </SelectItem>
+                        ))}
+                      {sections.filter((s: any) => s.course_id === verifyTarget.course_id).length === 0 && (
+                        <div className="p-2 text-sm text-muted-foreground text-center">No sections found for this course.</div>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

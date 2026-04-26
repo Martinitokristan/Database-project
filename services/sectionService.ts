@@ -1,8 +1,13 @@
 import { fetchApi } from '@/lib/fetchApi';
 
 export const sectionService = {
-  list:          (params?: { semester_id?: number }) => {
-    const qs = params?.semester_id ? `?semester_id=${params.semester_id}` : '';
+  list:          (params?: { semester_id?: number; course_id?: number; dept_id?: number; year_level_id?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.semester_id) searchParams.append('semester_id', String(params.semester_id));
+    if (params?.course_id) searchParams.append('course_id', String(params.course_id));
+    if (params?.dept_id) searchParams.append('dept_id', String(params.dept_id));
+    if (params?.year_level_id) searchParams.append('year_level_id', String(params.year_level_id));
+    const qs = searchParams.toString() ? `?${searchParams.toString()}` : '';
     return fetchApi(`/api/sections${qs}`);
   },
   get:           (id: number) => fetchApi(`/api/sections/${id}`),

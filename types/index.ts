@@ -93,21 +93,20 @@ export interface Semester {
 
 export interface Section {
   section_id:      number;
-  subject_id:      number;
-  instructor_id:   string;
   semester_id:     number;
   section_name:    string;
+  year_level_id?:  number | null;
+  year_level?:     string | null;
+  course_id?:      number | null;
+  course_name?:    string | null;
+  department_name?:string | null;
   capacity:        number;
-  subject?:        Subject;
-  instructor?:     User;
-  semester?:       Semester;
   enrolled_count?: number;
-  // Joined fields
-  subject_code?:   string;
-  subject_title?:  string;
+  is_archived?:    boolean;
+  created_at?:     string;
+  subject_codes?:  string;
   term?:           string;
   school_year?:    string;
-  semester_status?: 'Active' | 'Inactive';
 }
 
 export interface Schedule {
