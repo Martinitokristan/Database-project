@@ -828,6 +828,7 @@ export default function AcademicPortal() {
                   <SelectContent>
                     {sectionPool
                       .filter(s => String(s.semester_id) === selectedTermId)
+                      .filter(s => !s.dept_id || s.dept_id === selectedDept?.dept_id)
                       .map(s => <SelectItem key={s.section_id} value={String(s.section_id)}>{s.section_name}</SelectItem>)
                     }
                   </SelectContent>
@@ -839,7 +840,10 @@ export default function AcademicPortal() {
                 <Select name="instructor_id" required>
                   <SelectTrigger><SelectValue placeholder="Select faculty..." /></SelectTrigger>
                   <SelectContent>
-                    {faculty.map(f => <SelectItem key={f.user_id} value={f.user_id}>{f.last_name}, {f.first_name}</SelectItem>)}
+                    {faculty
+                      .filter(f => !f.dept_id || f.dept_id === selectedDept?.dept_id)
+                      .map(f => <SelectItem key={f.user_id} value={f.user_id}>{f.last_name}, {f.first_name}</SelectItem>)
+                    }
                   </SelectContent>
                 </Select>
               </div>
@@ -1036,9 +1040,12 @@ export default function AcademicPortal() {
               >
                 <SelectTrigger className="h-10"><SelectValue placeholder="Select faculty..." /></SelectTrigger>
                 <SelectContent>
-                  {faculty.map(f => (
-                    <SelectItem key={f.user_id} value={f.user_id}>{f.last_name}, {f.first_name}</SelectItem>
-                  ))}
+                  {faculty
+                    .filter(f => !f.dept_id || f.dept_id === selectedDept?.dept_id)
+                    .map(f => (
+                      <SelectItem key={f.user_id} value={f.user_id}>{f.last_name}, {f.first_name}</SelectItem>
+                    ))
+                  }
                 </SelectContent>
               </Select>
             </div>

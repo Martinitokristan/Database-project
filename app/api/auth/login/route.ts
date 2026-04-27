@@ -19,7 +19,8 @@ export const POST = apiHandler(async (req: NextRequest) => {
   const { email, password } = parsed.data;
 
   const users = await query<any[]>(
-    `SELECT u.*, r.role_name FROM users u
+    `SELECT u.user_id, u.email, u.password_hash, u.role_id, u.must_change_password, r.role_name 
+     FROM users u
      JOIN roles r ON u.role_id = r.role_id
      WHERE u.email = ? LIMIT 1`,
     [email]

@@ -638,7 +638,6 @@ function SettingsTab({ assessment, onRefresh }: { assessment: any; onRefresh: ()
     per_question_timer: a.per_question_timer ?? '',
     shuffle_questions: !!a.shuffle_questions,
     shuffle_choices: !!a.shuffle_choices,
-    allow_retakes: !!a.allow_retakes,
     max_attempts: a.max_attempts ?? 1,
     assessment_password: '',
     open_at: formatForInput(a.open_at),

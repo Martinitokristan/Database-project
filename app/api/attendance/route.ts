@@ -111,10 +111,10 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
       for (const s of enrollments) {
         await conn.execute(
-          `INSERT INTO attendance (enrollment_id, user_id, section_id, date, status, marked_by)
-           VALUES (?, (SELECT user_id FROM enrollments WHERE enrollment_id = ?), ?, ?, ?, ?)
+          `INSERT INTO attendance (enrollment_id, date, status, marked_by)
+           VALUES (?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE status = ?, marked_by = ?`,
-          [s.enrollment_id, s.enrollment_id, section_id, date, status, payload.user_id, status, payload.user_id]
+          [s.enrollment_id, date, status, payload.user_id, status, payload.user_id]
         );
       }
       return enrollments.length;
@@ -130,10 +130,10 @@ export const POST = apiHandler(async (req: NextRequest) => {
   const { enrollment_id, date, status } = parsed.data;
 
   await query(
-    `INSERT INTO attendance (enrollment_id, user_id, section_id, date, status, marked_by)
-     VALUES (?, (SELECT user_id FROM enrollments WHERE enrollment_id = ?), (SELECT section_id FROM enrollments WHERE enrollment_id = ?), ?, ?, ?)
+    `INSERT INTO attendance (enrollment_id, date, status, marked_by)
+     VALUES (?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE status = ?, marked_by = ?`,
-    [enrollment_id, enrollment_id, enrollment_id, date, status, payload.user_id, status, payload.user_id]
+    [enrollment_id, date, status, payload.user_id, status, payload.user_id]
   );
 
   return json({ success: true, message: 'Attendance saved.' });

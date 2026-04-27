@@ -16,6 +16,8 @@ export interface User {
   last_name?:           string;
   middle_name?:         string;
   avatar_url?:          string | null;
+  dept_id?:             number | null;
+  department_name?:     string | null;
   created_at?:          string;
 }
 
@@ -98,6 +100,7 @@ export interface Section {
   year_level_id?:  number | null;
   year_level?:     string | null;
   course_id?:      number | null;
+  dept_id?:        number | null;
   course_name?:    string | null;
   department_name?:string | null;
   capacity:        number;
@@ -161,7 +164,6 @@ export interface Assessment {
   per_question_timer?:number | null;
   shuffle_questions:  boolean;
   shuffle_choices:    boolean;
-  allow_retakes:      boolean;
   max_attempts:       number;
   assessment_password?:string | null;
   open_at?:           string | null;

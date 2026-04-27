@@ -67,6 +67,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
              JOIN subjects sub ON so.subject_id = sub.subject_id
              WHERE so.section_id = sec.section_id) as subject_codes,
             c.course_name,
+            c.dept_id,
             d.department_name
      FROM sections sec
      JOIN semesters sem ON sec.semester_id = sem.semester_id
@@ -77,7 +78,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
      ${where}
      GROUP BY sec.section_id, yl.level_name, sem.school_year, sem.term, sem.status,
               sec.section_name, sec.semester_id, sec.year_level_id, sec.capacity, sec.is_archived, sec.created_at,
-              c.course_name, d.department_name
+              c.course_name, c.dept_id, d.department_name
      ORDER BY sem.school_year DESC, sec.section_name
      ${limit}`,
     params
