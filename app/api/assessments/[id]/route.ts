@@ -89,7 +89,7 @@ export const PUT = apiHandler(async (req: NextRequest, ctx: { params: Promise<{ 
       timer_minutes || null, per_question_timer || null,
       shuffle_questions ? 1 : 0, shuffle_choices ? 1 : 0,
       max_attempts || 1,
-      assessment_password || null, open_at || null, close_at || null,
+      assessment_password || null, open_at ? new Date(open_at) : null, close_at ? new Date(close_at) : null,
       is_open ? 1 : 0, show_results ? 1 : 0,
       id,
     ]);

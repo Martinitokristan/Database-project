@@ -666,10 +666,8 @@ function SettingsTab({ assessment, onRefresh }: { assessment: any; onRefresh: ()
       // Format datetime for MySQL (YYYY-MM-DD HH:MM:SS)
       const formatDateTime = (dt: string) => {
         if (!dt) return null;
-        // If already contains space, it's formatted
-        if (dt.includes(' ')) return dt + ':00';
-        // Replace T with space and add seconds
-        return dt.replace('T', ' ') + ':00';
+        const date = new Date(dt);
+        return isNaN(date.getTime()) ? null : date.toISOString();
       };
 
       const payload = {
@@ -702,7 +700,7 @@ function SettingsTab({ assessment, onRefresh }: { assessment: any; onRefresh: ()
   }
 
   return (
-    <div className="max-w-xl space-y-6">
+    <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="max-w-xl space-y-6">
       <Card>
         <CardHeader><CardTitle className="text-base">Basic Info</CardTitle></CardHeader>
         <CardContent className="space-y-4">
@@ -810,13 +808,11 @@ function SettingsTab({ assessment, onRefresh }: { assessment: any; onRefresh: ()
         </CardContent>
       </Card>
 
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Save Settings
-        </Button>
-      </div>
-    </div>
+      <Button type="submit" disabled={saving}>
+        {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        Save Settings
+      </Button>
+    </form>
   );
 }
 
